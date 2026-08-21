@@ -235,7 +235,8 @@ def get_events(day_start, day_end):
 
 def fmt_time(d):
     h = d.hour % 12 or 12
-    return f"{h}:{d.minute:02d}" if d.minute else str(h)
+    suffix = "a" if d.hour < 12 else "p"
+    return f"{h}:{d.minute:02d}{suffix}" if d.minute else f"{h}{suffix}"
 
 
 def fmt_clock(d):
