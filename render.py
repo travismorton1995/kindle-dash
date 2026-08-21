@@ -69,9 +69,9 @@ WMO_ICON = {
 # used as the base of every cloud-derived icon, positioned in the upper
 # half of the 64x64 viewBox so accents (rain/snow/bolt/mist) sit below it.
 _CLOUD_TOP = (
-    '<rect x="10" y="10" width="44" height="16" rx="8"/>'
-    '<circle cx="22" cy="6" r="12"/><circle cx="34" cy="0" r="15"/>'
-    '<circle cx="46" cy="6" r="11"/>'
+    '<rect x="12" y="20" width="40" height="13" rx="6.5"/>'
+    '<circle cx="24" cy="18" r="13"/><circle cx="34" cy="15" r="15"/>'
+    '<circle cx="44" cy="18" r="12"/>'
 )
 
 WEATHER_ICON_SVG = {
