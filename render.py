@@ -114,6 +114,29 @@ WEATHER_ICON_SVG = {
         '<circle cx="21" cy="22" r="13"/><circle cx="35" cy="17" r="17"/>'
         '<circle cx="49" cy="22" r="12"/>'
     ),
+    # Crescents: a solid circle with a second, offset circle in paper-white
+    # drawn on top to bite out the crescent shape. Same halo-style technique
+    # as the cloud icons -- no strokes/gradients, just two solid fills.
+    "moon": (
+        '<circle cx="32" cy="32" r="22"/>'
+        '<circle cx="42" cy="24" r="19" fill="#fff"/>'
+    ),
+    "cloud-moon": (
+        # Positioned further clear of the cloud than the sun is in
+        # cloud-sun: a crescent has no rays poking out past its own
+        # silhouette, so it needs more real separation to read at all
+        # instead of being swallowed by the cloud's occlusion.
+        '<circle cx="19" cy="15" r="12"/>'
+        '<circle cx="25" cy="10" r="10" fill="#fff"/>'
+        '<g fill="#fff">'
+        '<rect x="10" y="32" width="50" height="23" rx="11.5"/>'
+        '<circle cx="25" cy="33" r="15"/><circle cx="37" cy="28" r="18"/>'
+        '<circle cx="48" cy="34" r="14"/>'
+        '</g>'
+        '<rect x="14" y="36" width="42" height="15" rx="7.5"/>'
+        '<circle cx="25" cy="33" r="11"/><circle cx="37" cy="28" r="14"/>'
+        '<circle cx="48" cy="34" r="10"/>'
+    ),
     "fog": (
         _CLOUD_TOP +
         '<g stroke="#000" stroke-width="5" stroke-linecap="round">'
@@ -154,9 +177,18 @@ WEATHER_ICON_SVG = {
 }
 
 
-def weather_icon(code, size=76):
-    body = WEATHER_ICON_SVG[WMO_ICON.get(code, "cloud")]
+def weather_icon(code, size=76, night=False):
+    cat = WMO_ICON.get(code, "cloud")
+    if night:
+        cat = {"sun": "moon", "cloud-sun": "cloud-moon"}.get(cat, cat)
+    body = WEATHER_ICON_SVG[cat]
     return f'<svg viewBox="0 0 64 64" width="{size}" height="{size}" fill="#000">{body}</svg>'
+
+
+def is_night(d, sunrise, sunset):
+    """Night by time-of-day only (ignores date), so it stays correct for
+    hourly-forecast points that roll past midnight into tomorrow."""
+    return d.time() < sunrise.time() or d.time() >= sunset.time()
 
 
 def fetch_json(url, headers=None, timeout=30):
@@ -179,11 +211,17 @@ def get_weather(now):
     d = fetch_json(url)
     cur, daily, hourly = d["current"], d["daily"], d["hourly"]
 
+    sunrise_dt = dt.datetime.fromisoformat(daily["sunrise"][0]).replace(tzinfo=TZ)
+    sunset_dt = dt.datetime.fromisoformat(daily["sunset"][0]).replace(tzinfo=TZ)
+
     upcoming = []
     for t, temp, code in zip(hourly["time"], hourly["temperature_2m"], hourly["weather_code"]):
         when = dt.datetime.fromisoformat(t).replace(tzinfo=TZ)
         if when > now:
-            upcoming.append({"hour": when, "temp": round(temp), "code": code})
+            upcoming.append({
+                "hour": when, "temp": round(temp), "code": code,
+                "is_night": is_night(when, sunrise_dt, sunset_dt),
+            })
             if len(upcoming) == 7:
                 break
 
@@ -191,12 +229,13 @@ def get_weather(now):
         "now": round(cur["temperature_2m"]),
         "feels": round(cur["apparent_temperature"]),
         "code": cur["weather_code"],
+        "is_night": is_night(now, sunrise_dt, sunset_dt),
         "label": WMO.get(cur["weather_code"], "—"),
         "high": round(daily["temperature_2m_max"][0]),
         "low": round(daily["temperature_2m_min"][0]),
         "pop": daily["precipitation_probability_max"][0] or 0,
-        "sunrise": fmt_sun(dt.datetime.fromisoformat(daily["sunrise"][0]).replace(tzinfo=TZ)),
-        "sunset": fmt_sun(dt.datetime.fromisoformat(daily["sunset"][0]).replace(tzinfo=TZ)),
+        "sunrise": fmt_sun(sunrise_dt),
+        "sunset": fmt_sun(sunset_dt),
         "tmr_high": round(daily["temperature_2m_max"][1]),
         "tmr_low": round(daily["temperature_2m_min"][1]),
         "tmr_code": daily["weather_code"][1],
@@ -284,7 +323,7 @@ def build_html(weather, timed, allday, tomorrow, tomorrow_allday, now):
 
     hourly_html = "".join(
         f'<div class="hr"><span class="hlabel">{fmt_hour_label(h["hour"])}</span>'
-        f'{weather_icon(h["code"], size=40)}'
+        f'{weather_icon(h["code"], size=40, night=h["is_night"])}'
         f'<span class="htemp">{h["temp"]}&deg;</span></div>'
         for h in weather["hourly"]
     )
@@ -318,7 +357,7 @@ def build_html(weather, timed, allday, tomorrow, tomorrow_allday, now):
         .replace("{{TEMP}}", str(weather["now"]))
         .replace("{{FEELS}}", str(weather["feels"]))
         .replace("{{COND}}", weather["label"])
-        .replace("{{WICON}}", weather_icon(weather["code"]))
+        .replace("{{WICON}}", weather_icon(weather["code"], night=weather["is_night"]))
         .replace("{{HIGH}}", str(weather["high"]))
         .replace("{{LOW}}", str(weather["low"]))
         .replace("{{POP}}", str(weather["pop"]))
