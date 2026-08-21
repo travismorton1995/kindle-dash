@@ -121,10 +121,26 @@ WEATHER_ICON_SVG = {
         '<line x1="22" y1="38" x2="17" y2="54"/><line x1="34" y1="38" x2="29" y2="54"/>'
         '<line x1="46" y1="38" x2="41" y2="54"/></g>'
     ),
+    # A standalone 6-armed snowflake rather than a cloud + dots: reads
+    # unambiguously as snow at a glance instead of looking like drizzle.
     "snow": (
-        _CLOUD_TOP +
-        '<circle cx="20" cy="46" r="4"/><circle cx="32" cy="52" r="4"/>'
-        '<circle cx="44" cy="46" r="4"/>'
+        '<circle cx="32" cy="32" r="4"/>'
+        '<g stroke="#000" stroke-width="6" stroke-linecap="round">'
+        '<line x1="32" y1="32" x2="58" y2="32"/>'
+        '<line x1="32" y1="32" x2="45" y2="54.5"/>'
+        '<line x1="32" y1="32" x2="19" y2="54.5"/>'
+        '<line x1="32" y1="32" x2="6" y2="32"/>'
+        '<line x1="32" y1="32" x2="19" y2="9.5"/>'
+        '<line x1="32" y1="32" x2="45" y2="9.5"/>'
+        '</g>'
+        '<g stroke="#000" stroke-width="4" stroke-linecap="round">'
+        '<line x1="49" y1="32" x2="55.9" y2="36"/><line x1="49" y1="32" x2="55.9" y2="28"/>'
+        '<line x1="40.5" y1="46.7" x2="47.4" y2="50.7"/><line x1="40.5" y1="46.7" x2="40.5" y2="54.7"/>'
+        '<line x1="23.5" y1="46.7" x2="23.5" y2="54.7"/><line x1="23.5" y1="46.7" x2="16.6" y2="50.7"/>'
+        '<line x1="15" y1="32" x2="8.1" y2="36"/><line x1="15" y1="32" x2="8.1" y2="28"/>'
+        '<line x1="23.5" y1="17.3" x2="16.6" y2="13.3"/><line x1="23.5" y1="17.3" x2="23.5" y2="9.3"/>'
+        '<line x1="40.5" y1="17.3" x2="40.5" y2="9.3"/><line x1="40.5" y1="17.3" x2="47.4" y2="13.3"/>'
+        '</g>'
     ),
     "storm": (
         _CLOUD_TOP +
