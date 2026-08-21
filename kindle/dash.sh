@@ -69,6 +69,12 @@ draw() {
                       # hardware attempts an unsupported swipe transition and
                       # spews "swipe feature is not supported" debug text onto
                       # the screen itself. Confirmed fixed on-device.
+
+  # Battery readout, drawn by eips itself in its plain console font (not the
+  # dashboard's Archivo styling — eips text mode can't do that). Row/col are
+  # eips's text-grid units, not pixels: this is a first guess at "bottom
+  # left corner" and may need nudging after seeing it on the actual screen.
+  eips 55 1 "BATT ${bat}%"
 }
 
 sleep_until_next() {
@@ -100,7 +106,7 @@ while true; do
   if [ "$bat" -lt 8 ]; then
     log "battery ${bat}%, stopping"
     eips -c
-    eips 5 20 "Battery low - charge and restart dash"
+    eips 5 20 "Battery low (${bat}%) - charge and restart dash"
     exit 0
   fi
 
