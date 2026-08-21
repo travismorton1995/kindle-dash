@@ -72,17 +72,15 @@ draw() {
 
   # Battery readout, drawn by eips itself in its plain console font (not the
   # dashboard's Archivo styling — eips text mode can't do that). No "%": this
-  # font is missing that glyph (silently dropped, confirmed via dash.log).
-  # Row 55 is confirmed working; rows >=150 overflow eips's internal pixel
-  # math and fail (logged "pixel not in range"), so it can't reach the lower
-  # screen this way.
+  # font is missing that glyph and silently drops it.
+  #
+  # Row 55 is as far down the screen as eips's text mode can reliably go on
+  # this hardware: rows >=150, and -x/-y (which still goes through the same
+  # row-based math for text despite being pixel-precise for image draws),
+  # both overflow its internal pixel math and fail ("pixel not in range" in
+  # dash.log). A true bottom-corner placement isn't reachable this way —
+  # confirmed via testing, not a guess — so this stays near the top.
   eips 55 1 "BATT ${bat}"
-
-  # TEMP: testing whether pixel-precise -x/-y (documented only for image
-  # draws in eips's usage text) also works for plain text, which would let
-  # us place this exactly instead of being confined near the top of the
-  # screen. Remove this line once we know either way.
-  eips -x 40 -y 1400 "PXTEST"
 }
 
 sleep_until_next() {

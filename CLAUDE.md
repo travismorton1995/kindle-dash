@@ -120,6 +120,16 @@ Verified on a real jailbroken PW4 (2026-08-21):
 - lipc frontlight property is **`flIntensity`** (camelCase, matching
   `wirelessEnable`/`cmState`/`battLevel`), not `fl_intensity` — the latter
   fails silently with `lipcErrNoSuchProperty`.
+- **`eips`'s plain text mode (`eips [row] [col] string`) can't reach the
+  lower screen on this hardware.** Row 55 works; row 150 already overflows
+  its internal pixel math (`eips: pixel_in_range> ... pixel not in range`
+  in dash.log, with nonsensical coordinates). `-x`/`-y` don't help either —
+  for text (unlike image draws) they still go through the same row-based
+  math, not real pixels. The true max valid row is somewhere in (55, 150),
+  unconfirmed beyond that. Text drawn this way is also missing glyphs (no
+  `%`, confirmed via `eips: paint_char> character "%" not available`) — it's
+  a limited debug font, not a real character set. Keep any eips-drawn
+  overlay text near the top of the screen and free of unusual punctuation.
 
 ## Known unknowns
 
