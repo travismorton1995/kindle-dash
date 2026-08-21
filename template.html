@@ -112,7 +112,8 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
 
 .stat.sun b {
   font-variation-settings: "wdth" 90, "wght" 700;
-  font-size: 21px;
+  font-size: 25px;
+  line-height: 1.15;
 }
 
 /* ---------- hourly forecast ---------- */
@@ -300,7 +301,7 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
         <div class="stat big"><span class="label">Low</span><b>{{LOW}}°</b></div>
         <div class="stat"><span class="label">Feels</span><b>{{FEELS}}°</b></div>
         <div class="stat"><span class="label">Precip</span><b>{{POP}}%</b></div>
-        <div class="stat sun"><span class="label">Sun</span><b>{{SUNRISE}}&nbsp;/&nbsp;{{SUNSET}}</b></div>
+        <div class="stat sun"><span class="label">Sun</span><b>{{SUNRISE}}</b><b>{{SUNSET}}</b></div>
       </div>
     </div>
   </div>
