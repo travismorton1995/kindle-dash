@@ -71,15 +71,18 @@ draw() {
                       # the screen itself. Confirmed fixed on-device.
 
   # Battery readout, drawn by eips itself in its plain console font (not the
-  # dashboard's Archivo styling — eips text mode can't do that).
-  # TEMP: multiple calibration markers at once instead of one guess, so a
-  # single photo reveals eips's row-to-pixel scale. Remove once the real
-  # position (row X below) is confirmed and the others are deleted.
-  eips 150 1 "ROW 150"
-  eips 300 1 "ROW 300"
-  eips 500 1 "ROW 500"
-  eips 800 1 "ROW 800"
-  eips 55 1 "BATT ${bat}%"
+  # dashboard's Archivo styling — eips text mode can't do that). No "%": this
+  # font is missing that glyph (silently dropped, confirmed via dash.log).
+  # Row 55 is confirmed working; rows >=150 overflow eips's internal pixel
+  # math and fail (logged "pixel not in range"), so it can't reach the lower
+  # screen this way.
+  eips 55 1 "BATT ${bat}"
+
+  # TEMP: testing whether pixel-precise -x/-y (documented only for image
+  # draws in eips's usage text) also works for plain text, which would let
+  # us place this exactly instead of being confined near the top of the
+  # screen. Remove this line once we know either way.
+  eips -x 40 -y 1400 "PXTEST"
 }
 
 sleep_until_next() {
