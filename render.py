@@ -5,7 +5,9 @@ Render a dashboard image for a jailbroken Kindle Paperwhite 4 (1072x1448).
 Output: dash.png, 8-bit grayscale, quantised to 16 levels.
 
 Configuration comes from environment variables:
-    ICS_URL     secret iCal address of your Google Calendar   (required)
+    ICS_URL     secret iCal address of your Google Calendar(s).      (required)
+                Comma-separated for more than one; events from all
+                are merged.
     LATITUDE    default 43.6532
     LONGITUDE   default -79.3832
     TIMEZONE    default America/Toronto
@@ -30,7 +32,7 @@ GRAY_LEVELS = 16
 TZ = zoneinfo.ZoneInfo(os.environ.get("TIMEZONE", "America/Toronto"))
 LAT = float(os.environ.get("LATITUDE", "43.6532"))
 LON = float(os.environ.get("LONGITUDE", "-79.3832"))
-ICS_URL = os.environ.get("ICS_URL")
+ICS_URLS = [u.strip() for u in os.environ.get("ICS_URL", "").split(",") if u.strip()]
 
 HERE = Path(__file__).parent
 
@@ -171,27 +173,28 @@ def get_weather(now):
 
 
 def get_events(day_start, day_end):
-    """Return (timed, allday) event dicts for the window given."""
-    if not ICS_URL:
+    """Return (timed, allday) event dicts for the window given, merged across all configured calendars."""
+    if not ICS_URLS:
         raise SystemExit("ICS_URL is not set. See README.")
 
-    req = urllib.request.Request(ICS_URL, headers={"User-Agent": "kindle-dash"})
-    with urllib.request.urlopen(req, timeout=45) as r:
-        cal = Calendar.from_ical(r.read())
-
     timed, allday = [], []
-    for e in recurring_ical_events.of(cal).between(day_start, day_end):
-        start = e["DTSTART"].dt
-        end = e.get("DTEND").dt if e.get("DTEND") else None
-        title = str(e.get("SUMMARY", "(no title)"))
-        loc = str(e.get("LOCATION", "")).strip()
+    for url in ICS_URLS:
+        req = urllib.request.Request(url, headers={"User-Agent": "kindle-dash"})
+        with urllib.request.urlopen(req, timeout=45) as r:
+            cal = Calendar.from_ical(r.read())
 
-        if isinstance(start, dt.datetime):
-            start = start.astimezone(TZ)
-            end = end.astimezone(TZ) if isinstance(end, dt.datetime) else start
-            timed.append({"start": start, "end": end, "title": title, "loc": loc})
-        else:
-            allday.append({"title": title, "loc": loc})
+        for e in recurring_ical_events.of(cal).between(day_start, day_end):
+            start = e["DTSTART"].dt
+            end = e.get("DTEND").dt if e.get("DTEND") else None
+            title = str(e.get("SUMMARY", "(no title)"))
+            loc = str(e.get("LOCATION", "")).strip()
+
+            if isinstance(start, dt.datetime):
+                start = start.astimezone(TZ)
+                end = end.astimezone(TZ) if isinstance(end, dt.datetime) else start
+                timed.append({"start": start, "end": end, "title": title, "loc": loc})
+            else:
+                allday.append({"title": title, "loc": loc})
 
     timed.sort(key=lambda x: x["start"])
     return timed, allday

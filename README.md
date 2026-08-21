@@ -22,6 +22,10 @@ Actions (hourly)                    Kindle (hourly)
 Google Calendar → the calendar's Settings → **Secret address in iCal format**.
 Anyone with this URL can read the calendar, so treat it as a password.
 
+To show more than one calendar (e.g. a shared family calendar and your
+personal one), comma-separate their secret URLs in `ICS_URL`. Events from all
+of them are merged into one list.
+
 ### 2. Repo
 
 Create it **private**. Then:
