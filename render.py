@@ -197,6 +197,7 @@ def get_weather(now):
         "pop": daily["precipitation_probability_max"][0] or 0,
         "tmr_high": round(daily["temperature_2m_max"][1]),
         "tmr_low": round(daily["temperature_2m_min"][1]),
+        "tmr_code": daily["weather_code"][1],
         "tmr_label": WMO.get(daily["weather_code"][1], "—"),
         "hourly": upcoming,
     }
@@ -317,6 +318,7 @@ def build_html(weather, timed, allday, tomorrow, tomorrow_allday, now):
         .replace("{{HOURLY}}", hourly_html)
         .replace("{{EVENTS}}", "".join(rows))
         .replace("{{ALLDAY}}", chips_html(allday))
+        .replace("{{TMRICON}}", weather_icon(weather["tmr_code"], size=42))
         .replace("{{TMRLABEL}}", weather["tmr_label"])
         .replace("{{TMRHIGH}}", str(weather["tmr_high"]))
         .replace("{{TMRLOW}}", str(weather["tmr_low"]))

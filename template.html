@@ -228,12 +228,18 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
 
 .tomorrow-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
 }
 
 .tomorrow-head .label { font-size: 22px; }
+
+.tomorrow-wx-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
 .tomorrow-wx {
   font-variation-settings: "wdth" 75, "wght" 600;
@@ -305,7 +311,10 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
   <div class="tomorrow">
     <div class="tomorrow-head">
       <span class="label">Tomorrow</span>
-      <span class="tomorrow-wx">{{TMRLABEL}} &nbsp;{{TMRHIGH}}° / {{TMRLOW}}°</span>
+      <div class="tomorrow-wx-wrap">
+        {{TMRICON}}
+        <span class="tomorrow-wx">{{TMRLABEL}} &nbsp;{{TMRHIGH}}° / {{TMRLOW}}°</span>
+      </div>
     </div>
     {{TMRALLDAY}}
     {{TMRROWS}}
