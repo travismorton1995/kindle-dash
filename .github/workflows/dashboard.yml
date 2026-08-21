@@ -38,6 +38,16 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      # Playwright's own browser binary isn't covered by pip's cache above --
+      # without this, every run re-downloads Chromium from scratch on a
+      # fresh runner. Keyed to requirements.txt so a playwright version bump
+      # invalidates it automatically.
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}
+
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
