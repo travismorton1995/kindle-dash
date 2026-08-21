@@ -172,7 +172,7 @@ def get_weather(now):
         "&current=temperature_2m,apparent_temperature,weather_code"
         "&hourly=temperature_2m,weather_code"
         "&daily=temperature_2m_max,temperature_2m_min,weather_code,"
-        "precipitation_probability_max"
+        "precipitation_probability_max,sunrise,sunset"
         "&forecast_days=2"
         f"&timezone={TZ.key.replace('/', '%2F')}"
     )
@@ -195,6 +195,8 @@ def get_weather(now):
         "high": round(daily["temperature_2m_max"][0]),
         "low": round(daily["temperature_2m_min"][0]),
         "pop": daily["precipitation_probability_max"][0] or 0,
+        "sunrise": fmt_sun(dt.datetime.fromisoformat(daily["sunrise"][0]).replace(tzinfo=TZ)),
+        "sunset": fmt_sun(dt.datetime.fromisoformat(daily["sunset"][0]).replace(tzinfo=TZ)),
         "tmr_high": round(daily["temperature_2m_max"][1]),
         "tmr_low": round(daily["temperature_2m_min"][1]),
         "tmr_code": daily["weather_code"][1],
@@ -238,6 +240,10 @@ def fmt_time(d):
 
 def fmt_clock(d):
     return f"{d.hour % 12 or 12}:{d.minute:02d} {d.strftime('%p')}".lower()
+
+
+def fmt_sun(d):
+    return f"{d.hour % 12 or 12}:{d.minute:02d}{'a' if d.hour < 12 else 'p'}"
 
 
 def fmt_hour_label(d):
@@ -315,6 +321,8 @@ def build_html(weather, timed, allday, tomorrow, tomorrow_allday, now):
         .replace("{{HIGH}}", str(weather["high"]))
         .replace("{{LOW}}", str(weather["low"]))
         .replace("{{POP}}", str(weather["pop"]))
+        .replace("{{SUNRISE}}", weather["sunrise"])
+        .replace("{{SUNSET}}", weather["sunset"])
         .replace("{{HOURLY}}", hourly_html)
         .replace("{{EVENTS}}", "".join(rows))
         .replace("{{ALLDAY}}", chips_html(allday))
