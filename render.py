@@ -29,6 +29,11 @@ from playwright.sync_api import sync_playwright
 WIDTH, HEIGHT = 1072, 1448
 GRAY_LEVELS = 16
 
+# How many of tomorrow's events to show: scales down as today gets busier,
+# so a light today doesn't leave a blank gap above the tomorrow section.
+TOMORROW_BASE_ROWS = 7
+TOMORROW_MIN_ROWS = 2
+
 TZ = zoneinfo.ZoneInfo(os.environ.get("TIMEZONE", "America/Toronto"))
 LAT = float(os.environ.get("LATITUDE", "43.6532"))
 LON = float(os.environ.get("LONGITUDE", "-79.3832"))
@@ -277,12 +282,18 @@ def build_html(weather, timed, allday, tomorrow, tomorrow_allday, now):
     )
 
     if tomorrow:
+        # A light "today" leaves room below the agenda, so show more of
+        # tomorrow instead of leaving that space empty; a packed "today"
+        # shows fewer so nothing gets crowded off the page.
+        today_load = len(timed) + len(allday[:4])
+        cap = max(TOMORROW_MIN_ROWS, TOMORROW_BASE_ROWS - today_load)
+
         rows2 = "".join(
             f'<div class="trow"><span class="ttime">{fmt_time(e["start"])}</span>'
             f'<span class="ttitle">{esc(e["title"])}</span></div>'
-            for e in tomorrow[:3]
+            for e in tomorrow[:cap]
         )
-        more = len(tomorrow) - 3
+        more = len(tomorrow) - cap
         if more > 0:
             rows2 += f'<div class="trow"><span class="ttime"></span><span class="ttitle dim">+{more} more</span></div>'
         tmr = rows2
