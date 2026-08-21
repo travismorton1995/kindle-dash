@@ -101,15 +101,34 @@ secret calendar URLs and coordinates, same pattern as `kindle/config.sh`.
   the token. If TLS fails on the Kindle, the fix is an updated CA bundle.
 - The Kindle's token must stay fine-grained, single-repo, Contents: Read.
 
+## Confirmed on physical device
+
+Verified on a real jailbroken PW4 (2026-08-21):
+
+- `rtc1` is the writable wakealarm on this unit; the `rtc0`/`rtc1` probe in
+  `find_rtc()` works as designed.
+- The Kindle's CA bundle trusts GitHub's certificate chain — `curl` against
+  `api.github.com` works with no TLS changes needed.
+- `eips -c` before drawing is not the cause of any on-screen glitching; safe
+  to keep for ghost-clearing.
+- **`eips -g` must be called with `-f` (full update).** Its default is a
+  partial update, which on this hardware attempts an unsupported "swipe"
+  transition and prints debug text (`update_to_display: ...` / `swipe
+  feature is not supported...`) directly onto the screen instead of a
+  legible log. `draw()` in `dash.sh` always passes `-f` now — don't drop it.
+- lipc frontlight property is **`flIntensity`** (camelCase, matching
+  `wirelessEnable`/`cmState`/`battLevel`), not `fl_intensity` — the latter
+  fails silently with `lipcErrNoSuchProperty`.
+
 ## Known unknowns
 
-Not yet verified on the physical device. If working on `dash.sh`, treat these as
-open questions rather than settled:
+Still open:
 
-- Whether the wake alarm is `rtc0` or `rtc1` (the script probes both).
-- Whether the Kindle's CA bundle still trusts GitHub's certificate chain.
-- How long wifi takes to reconnect after resume (30s is a guess).
-- Whether `eips -c` before every draw is necessary or causes unwanted flashing.
+- How long wifi takes to reconnect after resume (30s is a guess). Testing
+  so far has been over USB, which appears to interfere with both wifi
+  association and suspend-to-RAM (`echo mem > /sys/power/state` may no-op
+  while USB is attached) — retest unplugged, on battery, before trusting
+  timing measured here.
 
 When debugging the device, the log is at `/mnt/us/dash.log`. Ask for it rather
 than guessing.

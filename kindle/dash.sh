@@ -15,6 +15,7 @@ DIR="$(dirname "$0")"
 IMG=/tmp/dash.png
 LOG=/mnt/us/dash.log
 API="https://api.github.com/repos/${GITHUB_REPO}/contents/dash.png?ref=output"
+exec >>"$LOG" 2>&1
 
 log() { echo "$(date '+%F %T') $*" >> "$LOG"; }
 
@@ -64,7 +65,10 @@ fetch() {
 draw() {
   eips -c            # clear ghosting
   sleep 1
-  eips -g "$IMG"
+  eips -g "$IMG" -f  # -f: full update. Default is partial, which on this
+                      # hardware attempts an unsupported swipe transition and
+                      # spews "swipe feature is not supported" debug text onto
+                      # the screen itself. Confirmed fixed on-device.
 }
 
 sleep_until_next() {
@@ -85,7 +89,7 @@ log "starting (rtc=${WAKEALARM:-none})"
 
 stop lab126_gui 2>/dev/null || stop framework 2>/dev/null
 lipc-set-prop com.lab126.powerd preventScreenSaver 1
-lipc-set-prop com.lab126.powerd fl_intensity 0   # frontlight off; big battery win
+lipc-set-prop com.lab126.powerd flIntensity 0    # frontlight off; big battery win
 
 # ---- loop -----------------------------------------------------------------
 

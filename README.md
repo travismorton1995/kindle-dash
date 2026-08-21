@@ -88,15 +88,22 @@ These vary between Kindles and can't be looked up reliably — expect to discove
 them by trying:
 
 - **`rtc0` vs `rtc1`.** `dash.sh` probes both, but confirm which one it found in
-  the log. If suspend never wakes, this is the first suspect.
+  the log. If suspend never wakes, this is the first suspect. (Confirmed
+  `rtc1` on a real PW4.)
 - **TLS.** The Kindle's CA bundle is old. If `curl` fails with a certificate
   error, install a current bundle and point curl at it — don't reach for `-k`,
-  since the request carries your token.
+  since the request carries your token. (Confirmed working, no changes
+  needed, on a real PW4.)
 - **Wifi reconnect time.** 30 seconds is a guess. If fetches fail intermittently
-  after a suspend, raise the loop in `wifi_up`.
-- **`eips` ghosting.** `eips -c` before every draw is the conservative choice.
-  If you see flashing you dislike, try dropping it and doing a full clear only
-  every N refreshes.
+  after a suspend, raise the loop in `wifi_up`. Note: testing over USB seems
+  to interfere with both wifi association and suspend-to-RAM — measure this
+  unplugged, on battery.
+- **`eips` ghosting.** `eips -c` before every draw is the conservative choice
+  and isn't the source of on-screen glitches. If you see flashing you
+  dislike, try dropping it and doing a full clear only every N refreshes.
+- **`eips -g` needs `-f`.** Without it, `eips` defaults to a partial update
+  that attempts an unsupported swipe transition on some hardware and prints
+  debug text directly onto the screen. Always pass `-f` (full update).
 
 ## Design notes
 
