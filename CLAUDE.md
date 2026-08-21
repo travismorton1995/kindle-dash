@@ -5,9 +5,11 @@ Project context for Claude Code. Read this before changing anything.
 ## What this is
 
 A weather and calendar dashboard for a **jailbroken Kindle Paperwhite 4 (10th gen)**.
-GitHub Actions renders a PNG every 30 minutes (during the Kindle's active
+GitHub Actions renders a PNG every 20 minutes (during the Kindle's active
 hours only — see the `dashboard.yml` cron) and pushes it to a private branch.
-The Kindle wakes on an RTC alarm, fetches the PNG, draws it with `eips`, and
+The Kindle wakes on an RTC alarm every 30 minutes and fetches whatever's
+newest — the two cadences don't need to match, the Kindle just always grabs
+the latest available render. It draws the PNG with `eips` and
 suspends to RAM.
 
 There is no server. There is no always-on machine. Don't introduce one.
@@ -34,7 +36,7 @@ These are properties of the hardware, not preferences. Changing them breaks the 
 render.py          fetch data → build HTML → screenshot → quantise → dash.png
 template.html      the layout; placeholders are {{TOKENS}}, replaced by string
                    substitution in build_html(). No template engine.
-.github/workflows/ 30-min cron; force-pushes a single-commit `output` branch
+.github/workflows/ 20-min cron; force-pushes a single-commit `output` branch
 kindle/dash.sh     wake → wifi up → curl → eips → wifi down → suspend
 ```
 
@@ -45,7 +47,7 @@ Data sources:
   no consent screen, no client secret.
 
 The `output` branch is force-pushed as a fresh single commit every run. This is
-intentional: without it the repo grows by one PNG every 30 minutes forever. Don't "fix"
+intentional: without it the repo grows by one PNG every 20 minutes forever. Don't "fix"
 it into a normal commit history.
 
 ## Design intent

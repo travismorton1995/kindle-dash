@@ -1,13 +1,14 @@
 # kindle-dash
 
 Weather and calendar dashboard for a jailbroken Kindle Paperwhite 4 (1072×1448).
-GitHub Actions renders a PNG every 30 minutes into a private branch; the Kindle
-wakes on an RTC alarm, fetches it, draws it, and suspends.
+GitHub Actions renders a PNG every 20 minutes into a private branch; the Kindle
+wakes on an RTC alarm every 30 minutes, fetches whatever's newest, draws it,
+and suspends.
 
 No always-on machine, no third-party subscription, no calendar data on a public URL.
 
 ```
-Actions (every 30 min)              Kindle (every 30 min)
+Actions (every 20 min)              Kindle (every 30 min)
   Open-Meteo ─┐                       wake on RTC alarm
   your .ics ──┼─→ HTML → Chromium     wifi on
               │   screenshot →        curl the PNG (token auth)
@@ -38,7 +39,7 @@ Push this code, then Actions → Render dashboard → Run workflow. It should
 create an `output` branch containing `dash.png`.
 
 The workflow force-pushes a fresh single-commit branch each run. Without that
-you'd accumulate a PNG every 30 minutes forever.
+you'd accumulate a PNG every 20 minutes forever.
 
 ### 3. Token for the Kindle
 
