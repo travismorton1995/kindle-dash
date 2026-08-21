@@ -71,9 +71,14 @@ draw() {
                       # the screen itself. Confirmed fixed on-device.
 
   # Battery readout, drawn by eips itself in its plain console font (not the
-  # dashboard's Archivo styling — eips text mode can't do that). Row/col are
-  # eips's text-grid units, not pixels: this is a first guess at "bottom
-  # left corner" and may need nudging after seeing it on the actual screen.
+  # dashboard's Archivo styling — eips text mode can't do that).
+  # TEMP: multiple calibration markers at once instead of one guess, so a
+  # single photo reveals eips's row-to-pixel scale. Remove once the real
+  # position (row X below) is confirmed and the others are deleted.
+  eips 150 1 "ROW 150"
+  eips 300 1 "ROW 300"
+  eips 500 1 "ROW 500"
+  eips 800 1 "ROW 800"
   eips 55 1 "BATT ${bat}%"
 }
 
@@ -92,11 +97,6 @@ sleep_until_next() {
 # ---- setup ----------------------------------------------------------------
 
 log "starting (rtc=${WAKEALARM:-none})"
-
-# TEMP diagnostic: figure out eips's actual text-grid/framebuffer scale so
-# the battery readout position can be calculated instead of guessed again.
-# Remove once BATT position is confirmed correct.
-eips -i >/mnt/us/eips_info.txt 2>&1
 
 stop lab126_gui 2>/dev/null || stop framework 2>/dev/null
 lipc-set-prop com.lab126.powerd preventScreenSaver 1
