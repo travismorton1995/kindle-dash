@@ -4,5 +4,7 @@ __pycache__/
 venv/
 dash.png
 _render.html
-config.sh
+kindle/config.sh
+test.ics
+*.ics
 .env

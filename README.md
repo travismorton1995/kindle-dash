@@ -49,7 +49,7 @@ one thing: read this repo.
 ```sh
 # on the Kindle, over USB or SSH
 mkdir -p /mnt/us/extensions/dash
-# copy dash.sh and config.sh (from config.sh.example) into it
+# copy kindle/dash.sh and kindle/config.sh (from kindle/config.sh.example) into it
 chmod +x /mnt/us/extensions/dash/dash.sh
 ```
 
