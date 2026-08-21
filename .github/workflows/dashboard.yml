@@ -2,9 +2,10 @@ name: Render dashboard
 
 on:
   schedule:
-    # Hourly. GitHub's cron has a 5-minute floor and fires late under load,
-    # which is fine for weather and a calendar.
-    - cron: "5 * * * *"
+    # Every 30 min, matching the Kindle's REFRESH_SECONDS. GitHub's cron has
+    # a 5-minute floor and fires late under load, which is fine for weather
+    # and a calendar.
+    - cron: "5,35 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -53,7 +54,7 @@ jobs:
           git add dash.png
           git commit -qm "dashboard $(date -u +%FT%TZ)"
           # Force-push a fresh single-commit branch every time. Without this the
-          # repo would grow by one PNG an hour, forever.
+          # repo would grow by one PNG every 30 minutes, forever.
           git push -q --force \
             "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
             output
