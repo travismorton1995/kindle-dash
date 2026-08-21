@@ -14,10 +14,24 @@ DIR="$(dirname "$0")"
 
 IMG=/tmp/dash.png
 LOG=/mnt/us/dash.log
+LOG_MAX_LINES=5000  # a few days of history; keeps the log from growing forever
 API="https://api.github.com/repos/${GITHUB_REPO}/contents/dash.png?ref=output"
 exec >>"$LOG" 2>&1
 
 log() { echo "$(date '+%F %T') $*" >> "$LOG"; }
+
+# This process stays alive across every suspend/resume for the script's
+# whole (potentially weeks-long) lifetime, holding $LOG open via the exec
+# above. Truncating in place with cp (not mv/rename) matters: our open
+# append fd follows the inode, not the path, so replacing the path with a
+# new file would silently stop showing up here.
+trim_log() {
+  lines=$(wc -l < "$LOG" 2>/dev/null || echo 0)
+  if [ "$lines" -gt "$LOG_MAX_LINES" ]; then
+    tail -n "$LOG_MAX_LINES" "$LOG" > "$LOG.tmp" && cp "$LOG.tmp" "$LOG"
+    rm -f "$LOG.tmp"
+  fi
+}
 
 # Old Kindles have rtc0 on some models and rtc1 on others. Find the live one.
 find_rtc() {
@@ -106,6 +120,7 @@ lipc-set-prop com.lab126.powerd flIntensity 0    # frontlight off; big battery w
 # ---- loop -----------------------------------------------------------------
 
 while true; do
+  trim_log
   hour=$(date +%-H)
   bat=$(battery)
 

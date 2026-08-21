@@ -140,13 +140,10 @@ Still open:
   association and suspend-to-RAM (`echo mem > /sys/power/state` may no-op
   while USB is attached) — retest unplugged, on battery, before trusting
   timing measured here.
-- The battery readout's position (`eips 55 1 "BATT ..."` in `draw()`) is a
-  first guess at eips's text-grid row/col for "bottom left corner" — not yet
-  confirmed on-device. Adjust the row/col numbers after seeing where it
-  actually lands.
 
 When debugging the device, the log is at `/mnt/us/dash.log`. Ask for it rather
-than guessing.
+than guessing. It's self-trimming (`trim_log()`, capped at `LOG_MAX_LINES`)
+so it's safe to leave running unattended for weeks without filling storage.
 
 ## Style
 
