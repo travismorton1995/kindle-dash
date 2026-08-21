@@ -92,6 +92,7 @@ The screen is 16 levels of gray, 6 inches, read from across a room. There's no
 colour to encode meaning with, so the layout uses **width** instead: one variable
 font (Archivo) set very wide for numbers and very narrow for text.
 
-The rail is the point. Event blocks are positioned and sized by actual time, so
-a glance tells you shape of the day — where the gaps are, what's dense — before
-you read a single word. The heavy bar is now.
+The agenda is a condensed list, not a time-proportional rail — it spends space
+on what's scheduled instead of on empty hours. The heavy "NOW" bar marks where
+you are in the day; everything else stays quiet so that bar stays the loudest
+thing on the page.

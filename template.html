@@ -11,6 +11,9 @@
   Here it comes from width: one family (Archivo, variable width axis) set very
   wide for data and very narrow for text. Reads clearly at 16 gray levels from
   across a room, which colour and hairline decoration would not.
+
+  18px is a hard floor on every font-size below: this renders at ~300ppi on a
+  6" screen, so anything smaller stops being legible at arm's length.
 */
 :root {
   --ink: #000000;
@@ -37,8 +40,8 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
 
 .label {
   font-variation-settings: "wdth" 100, "wght" 700;
-  font-size: 15px;
-  letter-spacing: 0.22em;
+  font-size: 18px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--mid);
 }
@@ -69,7 +72,7 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
   border-bottom: 3px solid var(--ink);
   display: flex;
   align-items: flex-end;
-  gap: 32px;
+  gap: 28px;
 }
 
 .temp {
@@ -80,6 +83,8 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
 }
 
 .temp sup { font-size: 54px; vertical-align: top; line-height: 1; }
+
+.wicon { flex-shrink: 0; padding-bottom: 14px; }
 
 .wx { flex: 1; padding-bottom: 10px; }
 
@@ -96,7 +101,40 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
 
 .stat b {
   font-variation-settings: "wdth" 100, "wght" 700;
-  font-size: 30px;
+  font-size: 26px;
+}
+
+.stat.big b {
+  font-variation-settings: "wdth" 120, "wght" 800;
+  font-size: 46px;
+}
+
+/* ---------- hourly forecast ---------- */
+
+.hourly {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 22px;
+  padding-bottom: 22px;
+  border-bottom: 3px solid var(--ink);
+}
+
+.hr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.hr .hlabel {
+  font-variation-settings: "wdth" 100, "wght" 700;
+  font-size: 18px;
+  color: var(--mid);
+}
+
+.hr .htemp {
+  font-variation-settings: "wdth" 110, "wght" 700;
+  font-size: 24px;
 }
 
 /* ---------- all-day ---------- */
@@ -116,87 +154,65 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
   color: var(--paper);
 }
 
-/* ---------- the rail ---------- */
+/* ---------- agenda ---------- */
+/* A chronological list, not a time-proportional rail: it condenses dead
+   hours instead of spending page space on them. The "now" divider below
+   keeps the one thing worth being loud about loud. */
 
-.rail {
-  position: relative;
-  margin-top: 26px;
-  height: {{RAILH}}px;
-  padding-left: 86px;
+.agenda { margin-top: 22px; }
+
+.aevent {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--rule);
 }
 
-.hour {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  border-top: 1px solid var(--rule);
-  height: 0;
-}
-
-.hour span {
-  position: absolute;
-  left: 0;
-  top: -11px;
-  width: 62px;
-  text-align: right;
-  font-variation-settings: "wdth" 100, "wght" 600;
-  font-size: 17px;
-  color: var(--mid);
-  background: var(--paper);
-  padding-right: 6px;
-}
-
-.ev {
-  position: absolute;
-  background: var(--paper);
-  border-left: 7px solid var(--ink);
-  padding: 6px 12px;
-  overflow: hidden;
-  box-shadow: inset 0 0 0 1px var(--rule);
-}
-
-.ev .evtime {
+.aevent .time {
   font-variation-settings: "wdth" 100, "wght" 700;
-  font-size: 16px;
-  letter-spacing: 0.06em;
+  font-size: 19px;
   color: var(--mid);
+  width: 84px;
+  flex-shrink: 0;
+  text-align: right;
 }
 
-.ev .evtitle {
+.aevent .body { flex: 1; min-width: 0; }
+
+.aevent .title {
   font-variation-settings: "wdth" 75, "wght" 700;
-  font-size: 25px;
-  line-height: 1.12;
-  margin-top: 1px;
+  font-size: 26px;
+  line-height: 1.15;
 }
 
-.ev .loc {
+.aevent .loc {
   font-variation-settings: "wdth" 75, "wght" 400;
-  font-size: 17px;
+  font-size: 19px;
   color: var(--mid);
   margin-top: 3px;
 }
 
-.ev.past { border-left-color: var(--rule); }
-.ev.past .evtitle { color: var(--mid); }
+.aevent.past .title { color: var(--mid); }
+.aevent.past .time { color: var(--rule); }
 
-/* the one moment of real weight on the page: where you are in the day */
-.nowline {
-  position: absolute;
-  left: 62px;
-  right: 0;
-  height: 5px;
-  background: var(--ink);
+.title.dim { color: var(--mid); }
+
+.nowrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
 }
 
-.nowline::before {
-  content: "";
-  position: absolute;
-  left: -13px;
-  top: -7px;
-  width: 19px;
-  height: 19px;
-  background: var(--ink);
-  border-radius: 50%;
+.nowrow .bar { flex: 1; height: 5px; background: var(--ink); }
+
+.nowrow .tag {
+  font-variation-settings: "wdth" 100, "wght" 800;
+  font-size: 18px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 /* ---------- tomorrow ---------- */
@@ -257,23 +273,26 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
 
   <div class="weather">
     <div class="temp">{{TEMP}}<sup>°</sup></div>
+    <div class="wicon">{{WICON}}</div>
     <div class="wx">
       <div class="cond">{{COND}}</div>
       <div class="stats">
-        <div class="stat"><span class="label">High</span><b>{{HIGH}}°</b></div>
-        <div class="stat"><span class="label">Low</span><b>{{LOW}}°</b></div>
+        <div class="stat big"><span class="label">High</span><b>{{HIGH}}°</b></div>
+        <div class="stat big"><span class="label">Low</span><b>{{LOW}}°</b></div>
         <div class="stat"><span class="label">Feels</span><b>{{FEELS}}°</b></div>
         <div class="stat"><span class="label">Precip</span><b>{{POP}}%</b></div>
       </div>
     </div>
   </div>
 
+  <div class="hourly">
+    {{HOURLY}}
+  </div>
+
   {{ALLDAY}}
 
-  <div class="rail">
-    {{HOURS}}
+  <div class="agenda">
     {{EVENTS}}
-    {{NOWLINE}}
   </div>
 
   <div class="tomorrow">

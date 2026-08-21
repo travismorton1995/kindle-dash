@@ -9,8 +9,6 @@ Configuration comes from environment variables:
     LATITUDE    default 43.6532
     LONGITUDE   default -79.3832
     TIMEZONE    default America/Toronto
-    DAY_START   first hour on the rail, default 7
-    DAY_END     last hour on the rail, default 22
 """
 
 import datetime as dt
@@ -33,13 +31,10 @@ TZ = zoneinfo.ZoneInfo(os.environ.get("TIMEZONE", "America/Toronto"))
 LAT = float(os.environ.get("LATITUDE", "43.6532"))
 LON = float(os.environ.get("LONGITUDE", "-79.3832"))
 ICS_URL = os.environ.get("ICS_URL")
-DAY_START = int(os.environ.get("DAY_START", "7"))
-DAY_END = int(os.environ.get("DAY_END", "22"))
 
 HERE = Path(__file__).parent
 
-# WMO weather codes -> short human labels. Text rather than icons: it survives
-# grayscale rendering and avoids emoji font surprises in headless Chromium.
+# WMO weather codes -> short human labels.
 WMO = {
     0: "Clear", 1: "Mostly clear", 2: "Partly cloudy", 3: "Overcast",
     45: "Fog", 48: "Freezing fog",
@@ -53,6 +48,84 @@ WMO = {
     95: "Thunderstorms", 96: "Thunderstorms", 99: "Thunderstorms",
 }
 
+# WMO weather codes -> icon category. A handful of hand-drawn flat shapes
+# (solid fills, no gradients) rather than an icon font or emoji: those render
+# unpredictably in headless Chromium and turn to mush at 16 gray levels.
+WMO_ICON = {
+    0: "sun", 1: "sun",
+    2: "cloud-sun",
+    3: "cloud",
+    45: "fog", 48: "fog",
+    51: "rain", 53: "rain", 55: "rain", 56: "rain", 57: "rain",
+    61: "rain", 63: "rain", 65: "rain", 66: "rain", 67: "rain",
+    80: "rain", 81: "rain", 82: "rain",
+    71: "snow", 73: "snow", 75: "snow", 77: "snow", 85: "snow", 86: "snow",
+    95: "storm", 96: "storm", 99: "storm",
+}
+
+# Shared cloud silhouette (a rounded bar plus three overlapping circles)
+# used as the base of every cloud-derived icon, positioned in the upper
+# half of the 64x64 viewBox so accents (rain/snow/bolt/mist) sit below it.
+_CLOUD_TOP = (
+    '<rect x="10" y="10" width="44" height="16" rx="8"/>'
+    '<circle cx="22" cy="6" r="12"/><circle cx="34" cy="0" r="15"/>'
+    '<circle cx="46" cy="6" r="11"/>'
+)
+
+WEATHER_ICON_SVG = {
+    "sun": (
+        '<circle cx="32" cy="32" r="13"/>'
+        '<g stroke="#000" stroke-width="5" stroke-linecap="round">'
+        '<line x1="32" y1="4" x2="32" y2="14"/><line x1="32" y1="50" x2="32" y2="60"/>'
+        '<line x1="4" y1="32" x2="14" y2="32"/><line x1="50" y1="32" x2="60" y2="32"/>'
+        '<line x1="12" y1="12" x2="19" y2="19"/><line x1="45" y1="45" x2="52" y2="52"/>'
+        '<line x1="12" y1="52" x2="19" y2="45"/><line x1="45" y1="19" x2="52" y2="12"/>'
+        '</g>'
+    ),
+    "cloud-sun": (
+        '<circle cx="24" cy="22" r="10"/>'
+        '<g stroke="#000" stroke-width="4" stroke-linecap="round">'
+        '<line x1="24" y1="2" x2="24" y2="8"/><line x1="4" y1="22" x2="10" y2="22"/>'
+        '<line x1="10" y1="8" x2="14" y2="12"/><line x1="38" y1="8" x2="34" y2="12"/>'
+        '</g>'
+        # drawn after (on top of) the sun, so it naturally occludes the overlap
+        '<rect x="14" y="36" width="42" height="15" rx="7.5"/>'
+        '<circle cx="25" cy="33" r="11"/><circle cx="37" cy="28" r="14"/>'
+        '<circle cx="48" cy="34" r="10"/>'
+    ),
+    "cloud": (
+        '<rect x="8" y="26" width="48" height="18" rx="9"/>'
+        '<circle cx="21" cy="22" r="13"/><circle cx="35" cy="15" r="17"/>'
+        '<circle cx="49" cy="22" r="12"/>'
+    ),
+    "fog": (
+        _CLOUD_TOP +
+        '<g stroke="#000" stroke-width="5" stroke-linecap="round">'
+        '<line x1="10" y1="42" x2="54" y2="42"/><line x1="14" y1="51" x2="50" y2="51"/>'
+        '<line x1="18" y1="60" x2="46" y2="60"/></g>'
+    ),
+    "rain": (
+        _CLOUD_TOP +
+        '<g stroke="#000" stroke-width="5" stroke-linecap="round">'
+        '<line x1="22" y1="38" x2="17" y2="54"/><line x1="34" y1="38" x2="29" y2="54"/>'
+        '<line x1="46" y1="38" x2="41" y2="54"/></g>'
+    ),
+    "snow": (
+        _CLOUD_TOP +
+        '<circle cx="20" cy="46" r="4"/><circle cx="32" cy="52" r="4"/>'
+        '<circle cx="44" cy="46" r="4"/>'
+    ),
+    "storm": (
+        _CLOUD_TOP +
+        '<polygon points="34,36 22,54 30,54 26,64 46,42 36,42"/>'
+    ),
+}
+
+
+def weather_icon(code, size=76):
+    body = WEATHER_ICON_SVG[WMO_ICON.get(code, "cloud")]
+    return f'<svg viewBox="0 0 64 64" width="{size}" height="{size}" fill="#000">{body}</svg>'
+
 
 def fetch_json(url, headers=None, timeout=30):
     req = urllib.request.Request(url, headers=headers or {})
@@ -60,21 +133,32 @@ def fetch_json(url, headers=None, timeout=30):
         return json.loads(r.read().decode())
 
 
-def get_weather():
+def get_weather(now):
     url = (
         "https://api.open-meteo.com/v1/forecast"
         f"?latitude={LAT}&longitude={LON}"
         "&current=temperature_2m,apparent_temperature,weather_code"
+        "&hourly=temperature_2m,weather_code"
         "&daily=temperature_2m_max,temperature_2m_min,weather_code,"
         "precipitation_probability_max"
         "&forecast_days=2"
         f"&timezone={TZ.key.replace('/', '%2F')}"
     )
     d = fetch_json(url)
-    cur, daily = d["current"], d["daily"]
+    cur, daily, hourly = d["current"], d["daily"], d["hourly"]
+
+    upcoming = []
+    for t, temp, code in zip(hourly["time"], hourly["temperature_2m"], hourly["weather_code"]):
+        when = dt.datetime.fromisoformat(t).replace(tzinfo=TZ)
+        if when > now:
+            upcoming.append({"hour": when, "temp": round(temp), "code": code})
+            if len(upcoming) == 7:
+                break
+
     return {
         "now": round(cur["temperature_2m"]),
         "feels": round(cur["apparent_temperature"]),
+        "code": cur["weather_code"],
         "label": WMO.get(cur["weather_code"], "—"),
         "high": round(daily["temperature_2m_max"][0]),
         "low": round(daily["temperature_2m_min"][0]),
@@ -82,6 +166,7 @@ def get_weather():
         "tmr_high": round(daily["temperature_2m_max"][1]),
         "tmr_low": round(daily["temperature_2m_min"][1]),
         "tmr_label": WMO.get(daily["weather_code"][1], "—"),
+        "hourly": upcoming,
     }
 
 
@@ -112,98 +197,66 @@ def get_events(day_start, day_end):
     return timed, allday
 
 
-def assign_columns(events):
-    """Pack overlapping events into side-by-side columns."""
-    for e in events:
-        e["col"] = 0
-        e["cols"] = 1
-
-    group, group_end = [], None
-    groups = []
-    for e in events:
-        if group_end is None or e["start"] < group_end:
-            group.append(e)
-            group_end = max(group_end or e["end"], e["end"])
-        else:
-            groups.append(group)
-            group, group_end = [e], e["end"]
-    if group:
-        groups.append(group)
-
-    for g in groups:
-        cols = []  # end time of last event in each column
-        for e in g:
-            placed = False
-            for i, end in enumerate(cols):
-                if e["start"] >= end:
-                    e["col"] = i
-                    cols[i] = e["end"]
-                    placed = True
-                    break
-            if not placed:
-                e["col"] = len(cols)
-                cols.append(e["end"])
-        for e in g:
-            e["cols"] = len(cols)
-    return events
-
-
 def fmt_time(d):
-    s = d.strftime("%-I:%M")
-    return s.replace(":00", "")
+    h = d.hour % 12 or 12
+    return f"{h}:{d.minute:02d}" if d.minute else str(h)
+
+
+def fmt_clock(d):
+    return f"{d.hour % 12 or 12}:{d.minute:02d} {d.strftime('%p')}".lower()
+
+
+def fmt_hour_label(d):
+    return f"{d.hour % 12 or 12}{'a' if d.hour < 12 else 'p'}"
 
 
 def build_html(weather, timed, allday, tomorrow, now):
-    span_hours = DAY_END - DAY_START
-    rail_h = 700  # px of rail body
-
-    def y_for(moment):
-        h = moment.hour + moment.minute / 60
-        h = max(DAY_START, min(DAY_END, h))
-        return (h - DAY_START) / span_hours * rail_h
-
-    hour_marks = "".join(
-        f'<div class="hour" style="top:{(h - DAY_START) / span_hours * rail_h}px">'
-        f'<span>{(h - 1) % 12 + 1}</span></div>'
-        for h in range(DAY_START, DAY_END + 1)
+    rows = []
+    now_marker = (
+        '<div class="nowrow"><span class="bar"></span>'
+        f'<span class="tag">Now &middot; {fmt_clock(now)}</span>'
+        '<span class="bar"></span></div>'
     )
-
-    blocks = []
+    if not timed:
+        rows.append('<div class="aevent"><div class="body">'
+                     '<div class="title dim">Nothing scheduled</div></div></div>')
+    inserted = False
     for e in timed:
-        top = y_for(e["start"])
-        bot = y_for(e["end"])
-        height = max(34, bot - top)
-        width = 100 / e["cols"]
-        left = e["col"] * width
+        if not inserted and now < e["start"]:
+            rows.append(now_marker)
+            inserted = True
         past = "past" if e["end"] < now else ""
-        loc = f'<div class="loc">{esc(e["loc"])}</div>' if e["loc"] and height > 62 else ""
-        blocks.append(
-            f'<div class="ev {past}" style="top:{top}px;height:{height}px;'
-            f'left:{left}%;width:calc({width}% - 8px)">'
-            f'<div class="evtime">{fmt_time(e["start"])}</div>'
-            f'<div class="evtitle">{esc(e["title"])}</div>{loc}</div>'
+        loc = f'<div class="loc">{esc(e["loc"])}</div>' if e["loc"] else ""
+        rows.append(
+            f'<div class="aevent {past}"><span class="time">{fmt_time(e["start"])}</span>'
+            f'<div class="body"><div class="title">{esc(e["title"])}</div>{loc}</div></div>'
         )
-
-    now_line = ""
-    if DAY_START <= now.hour < DAY_END:
-        now_line = f'<div class="nowline" style="top:{y_for(now)}px"></div>'
+    if not inserted:
+        rows.append(now_marker)
 
     allday_html = ""
     if allday:
         chips = "".join(f'<span class="chip">{esc(a["title"])}</span>' for a in allday[:4])
         allday_html = f'<div class="allday">{chips}</div>'
 
+    hourly_html = "".join(
+        f'<div class="hr"><span class="hlabel">{fmt_hour_label(h["hour"])}</span>'
+        f'{weather_icon(h["code"], size=40)}'
+        f'<span class="htemp">{h["temp"]}&deg;</span></div>'
+        for h in weather["hourly"]
+    )
+
     tmr = ""
     if tomorrow:
-        rows = "".join(
+        rows2 = "".join(
             f'<div class="trow"><span class="ttime">{fmt_time(e["start"])}</span>'
             f'<span class="ttitle">{esc(e["title"])}</span></div>'
             for e in tomorrow[:3]
         )
         more = len(tomorrow) - 3
         if more > 0:
-            rows += f'<div class="trow"><span class="ttime"></span><span class="ttitle dim">+{more} more</span></div>'
-        tmr = rows
+            rows2 += f'<div class="trow"><span class="ttime"></span><span class="ttitle dim">+{more} more</span></div>'
+        tmr = rows2
     else:
         tmr = '<div class="trow"><span class="ttime"></span><span class="ttitle dim">Nothing scheduled</span></div>'
 
@@ -211,23 +264,22 @@ def build_html(weather, timed, allday, tomorrow, now):
     return (
         template
         .replace("{{DATE}}", now.strftime("%A").upper())
-        .replace("{{DATENUM}}", now.strftime("%-d %B").upper())
+        .replace("{{DATENUM}}", f"{now.day} {now.strftime('%B')}".upper())
         .replace("{{TEMP}}", str(weather["now"]))
         .replace("{{FEELS}}", str(weather["feels"]))
         .replace("{{COND}}", weather["label"])
+        .replace("{{WICON}}", weather_icon(weather["code"]))
         .replace("{{HIGH}}", str(weather["high"]))
         .replace("{{LOW}}", str(weather["low"]))
         .replace("{{POP}}", str(weather["pop"]))
-        .replace("{{HOURS}}", hour_marks)
-        .replace("{{EVENTS}}", "".join(blocks))
-        .replace("{{NOWLINE}}", now_line)
+        .replace("{{HOURLY}}", hourly_html)
+        .replace("{{EVENTS}}", "".join(rows))
         .replace("{{ALLDAY}}", allday_html)
         .replace("{{TMRLABEL}}", weather["tmr_label"])
         .replace("{{TMRHIGH}}", str(weather["tmr_high"]))
         .replace("{{TMRLOW}}", str(weather["tmr_low"]))
         .replace("{{TMRROWS}}", tmr)
-        .replace("{{UPDATED}}", now.strftime("%-I:%M %p").lower())
-        .replace("{{RAILH}}", str(rail_h))
+        .replace("{{UPDATED}}", fmt_clock(now))
     )
 
 
@@ -264,11 +316,10 @@ def main():
     now = dt.datetime.now(TZ)
     today = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    weather = get_weather()
+    weather = get_weather(now)
     timed, allday = get_events(today, today + dt.timedelta(days=1))
     tomorrow, _ = get_events(today + dt.timedelta(days=1), today + dt.timedelta(days=2))
 
-    assign_columns(timed)
     html = build_html(weather, timed, allday, tomorrow, now)
 
     out = HERE / "dash.png"

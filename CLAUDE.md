@@ -55,13 +55,23 @@ font width**, not hue. One variable family (Archivo) set very wide for numerals
 and very narrow for text. That substitution is the point of the design; don't
 replace it with a second typeface or a colour accent.
 
-**The rail is the signature element.** Events are absolutely positioned and sized
-by their real start and end times, so the shape of the day — where the gaps are,
-what's dense — reads before any words do. The heavy black bar is now. Keep
-everything else quiet so that bar stays the loudest thing on the page.
+**The agenda is a condensed chronological list, not a time-proportional rail.**
+An earlier version positioned events by real start/end time on a fixed-height
+rail; that was replaced deliberately because it burned most of the page on
+whatever hours had no events. The list only spends space on what's actually
+scheduled. The "NOW · h:mm" divider row (`.nowrow`) carries over the old
+rail's one rule — it's still the heaviest thing on the page, inserted at the
+correct chronological position between the list's past and future events.
+Keep everything else quiet so that bar stays the loudest thing on the page.
 
-Weather is text labels, not icons. Emoji and icon fonts render unpredictably in
-headless Chromium and badly at 16 gray levels.
+**Weather icons are hand-drawn flat SVG, not emoji or an icon font.**
+`render.py`'s `WEATHER_ICON_SVG` holds ~7 solid-black shapes (sun, cloud,
+cloud-sun, fog, rain, snow, storm) built from basic primitives (circle, rect,
+line, polygon) on a 64×64 viewBox, keyed off WMO code via `WMO_ICON`. Emoji
+and icon fonts were rejected for rendering unpredictably in headless Chromium
+and turning to mush at 16 gray levels; solid vector shapes with no gradients
+sidestep both problems. Keep new icons in that same style — flat fills, thick
+strokes, no fine detail that will disappear at ~40px on an e-ink screen.
 
 If asked to make it "nicer," resist adding elements. The failure mode for this
 page is clutter, not plainness.
