@@ -74,6 +74,14 @@ open dash.png
 `ICS_URL` accepts a `file://` path, so you can save a copy of your calendar once
 and iterate on the design offline.
 
+To check against your real calendar and weather instead, copy `local.sh.example`
+to `local.sh` (gitignored — holds real secrets, same as `kindle/config.sh`),
+fill in `ICS_URL`/`LATITUDE`/`LONGITUDE`/`TIMEZONE`, then:
+
+```sh
+source local.sh && python render.py
+```
+
 ## Things to verify on your specific device
 
 These vary between Kindles and can't be looked up reliably — expect to discover

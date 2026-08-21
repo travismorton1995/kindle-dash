@@ -213,7 +213,14 @@ def fmt_hour_label(d):
     return f"{d.hour % 12 or 12}{'a' if d.hour < 12 else 'p'}"
 
 
-def build_html(weather, timed, allday, tomorrow, now):
+def chips_html(allday):
+    if not allday:
+        return ""
+    chips = "".join(f'<span class="chip">{esc(a["title"])}</span>' for a in allday[:4])
+    return f'<div class="allday">{chips}</div>'
+
+
+def build_html(weather, timed, allday, tomorrow, tomorrow_allday, now):
     rows = []
     now_marker = (
         '<div class="nowrow"><span class="bar"></span>'
@@ -237,11 +244,6 @@ def build_html(weather, timed, allday, tomorrow, now):
     if not inserted:
         rows.append(now_marker)
 
-    allday_html = ""
-    if allday:
-        chips = "".join(f'<span class="chip">{esc(a["title"])}</span>' for a in allday[:4])
-        allday_html = f'<div class="allday">{chips}</div>'
-
     hourly_html = "".join(
         f'<div class="hr"><span class="hlabel">{fmt_hour_label(h["hour"])}</span>'
         f'{weather_icon(h["code"], size=40)}'
@@ -249,7 +251,6 @@ def build_html(weather, timed, allday, tomorrow, now):
         for h in weather["hourly"]
     )
 
-    tmr = ""
     if tomorrow:
         rows2 = "".join(
             f'<div class="trow"><span class="ttime">{fmt_time(e["start"])}</span>'
@@ -260,8 +261,10 @@ def build_html(weather, timed, allday, tomorrow, now):
         if more > 0:
             rows2 += f'<div class="trow"><span class="ttime"></span><span class="ttitle dim">+{more} more</span></div>'
         tmr = rows2
-    else:
+    elif not tomorrow_allday:
         tmr = '<div class="trow"><span class="ttime"></span><span class="ttitle dim">Nothing scheduled</span></div>'
+    else:
+        tmr = ""
 
     template = (HERE / "template.html").read_text()
     return (
@@ -277,10 +280,11 @@ def build_html(weather, timed, allday, tomorrow, now):
         .replace("{{POP}}", str(weather["pop"]))
         .replace("{{HOURLY}}", hourly_html)
         .replace("{{EVENTS}}", "".join(rows))
-        .replace("{{ALLDAY}}", allday_html)
+        .replace("{{ALLDAY}}", chips_html(allday))
         .replace("{{TMRLABEL}}", weather["tmr_label"])
         .replace("{{TMRHIGH}}", str(weather["tmr_high"]))
         .replace("{{TMRLOW}}", str(weather["tmr_low"]))
+        .replace("{{TMRALLDAY}}", chips_html(tomorrow_allday))
         .replace("{{TMRROWS}}", tmr)
         .replace("{{UPDATED}}", fmt_clock(now))
     )
@@ -321,9 +325,9 @@ def main():
 
     weather = get_weather(now)
     timed, allday = get_events(today, today + dt.timedelta(days=1))
-    tomorrow, _ = get_events(today + dt.timedelta(days=1), today + dt.timedelta(days=2))
+    tomorrow, tomorrow_allday = get_events(today + dt.timedelta(days=1), today + dt.timedelta(days=2))
 
-    html = build_html(weather, timed, allday, tomorrow, now)
+    html = build_html(weather, timed, allday, tomorrow, tomorrow_allday, now)
 
     out = HERE / "dash.png"
     shoot(html, out)

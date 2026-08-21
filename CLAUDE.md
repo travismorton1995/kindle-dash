@@ -86,10 +86,15 @@ ICS_URL="file://$PWD/test.ics" python render.py && open dash.png
 `ICS_URL` accepts `file://`, so layout work needs no network and no secrets.
 Iterate here — never debug design on the device.
 
+To check against real calendar/weather data, `source local.sh && python
+render.py` — `local.sh` (gitignored, copy from `local.sh.example`) holds real
+secret calendar URLs and coordinates, same pattern as `kindle/config.sh`.
+
 ## Security rules
 
 - **Never commit `test.ics` or any calendar data.** It's the full calendar in
   plaintext. It's in `.gitignore`; keep it there.
+- **Never commit `local.sh`.** It holds real secret calendar URLs.
 - **Never commit `kindle/config.sh`.** It holds the GitHub token.
 - **Never echo or log `GITHUB_TOKEN`**, including in debug output.
 - **Never suggest `curl -k` / `--insecure` in `dash.sh`.** That request carries

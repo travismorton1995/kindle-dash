@@ -8,3 +8,4 @@ kindle/config.sh
 test.ics
 *.ics
 .env
+local.sh

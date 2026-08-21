@@ -1,0 +1,12 @@
+# Copy to local.sh (gitignored) and fill in, then:
+#   source local.sh && python render.py
+#
+# Convenience for testing against real data instead of test.ics. Holds real
+# secrets, same as kindle/config.sh — never commit local.sh.
+
+# Comma-separate more than one calendar's secret iCal URL to merge them.
+export ICS_URL="https://calendar.google.com/calendar/ical/.../basic.ics"
+
+export LATITUDE="43.6532"
+export LONGITUDE="-79.3832"
+export TIMEZONE="America/Toronto"
