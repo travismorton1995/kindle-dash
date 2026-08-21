@@ -90,14 +90,23 @@ WEATHER_ICON_SVG = {
         '<line x1="24" y1="2" x2="24" y2="8"/><line x1="4" y1="22" x2="10" y2="22"/>'
         '<line x1="10" y1="8" x2="14" y2="12"/><line x1="38" y1="8" x2="34" y2="12"/>'
         '</g>'
-        # drawn after (on top of) the sun, so it naturally occludes the overlap
+        # A slightly larger white "halo" copy of the cloud, drawn as one
+        # filled pass so its own overlapping circles merge seamlessly, then
+        # the real cloud on top at normal size. That leaves a clean margin
+        # around the cloud's outer silhouette without seams where the cloud
+        # overlaps itself.
+        '<g fill="#fff">'
+        '<rect x="10" y="32" width="50" height="23" rx="11.5"/>'
+        '<circle cx="25" cy="33" r="15"/><circle cx="37" cy="28" r="18"/>'
+        '<circle cx="48" cy="34" r="14"/>'
+        '</g>'
         '<rect x="14" y="36" width="42" height="15" rx="7.5"/>'
         '<circle cx="25" cy="33" r="11"/><circle cx="37" cy="28" r="14"/>'
         '<circle cx="48" cy="34" r="10"/>'
     ),
     "cloud": (
         '<rect x="8" y="26" width="48" height="18" rx="9"/>'
-        '<circle cx="21" cy="22" r="13"/><circle cx="35" cy="15" r="17"/>'
+        '<circle cx="21" cy="22" r="13"/><circle cx="35" cy="17" r="17"/>'
         '<circle cx="49" cy="22" r="12"/>'
     ),
     "fog": (
