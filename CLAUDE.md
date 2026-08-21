@@ -5,7 +5,8 @@ Project context for Claude Code. Read this before changing anything.
 ## What this is
 
 A weather and calendar dashboard for a **jailbroken Kindle Paperwhite 4 (10th gen)**.
-GitHub Actions renders a PNG every 30 minutes and pushes it to a private branch.
+GitHub Actions renders a PNG every 30 minutes (during the Kindle's active
+hours only — see the `dashboard.yml` cron) and pushes it to a private branch.
 The Kindle wakes on an RTC alarm, fetches the PNG, draws it with `eips`, and
 suspends to RAM.
 
