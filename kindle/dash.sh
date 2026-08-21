@@ -93,6 +93,11 @@ sleep_until_next() {
 
 log "starting (rtc=${WAKEALARM:-none})"
 
+# TEMP diagnostic: figure out eips's actual text-grid/framebuffer scale so
+# the battery readout position can be calculated instead of guessed again.
+# Remove once BATT position is confirmed correct.
+eips -i >/mnt/us/eips_info.txt 2>&1
+
 stop lab126_gui 2>/dev/null || stop framework 2>/dev/null
 lipc-set-prop com.lab126.powerd preventScreenSaver 1
 lipc-set-prop com.lab126.powerd flIntensity 0    # frontlight off; big battery win
