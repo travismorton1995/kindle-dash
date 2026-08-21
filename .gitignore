@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+dash.png
+_render.html
+config.sh
+.env

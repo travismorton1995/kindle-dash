@@ -1,0 +1,12 @@
+# Copy to config.sh on the Kindle and fill in.
+GITHUB_REPO="yourname/kindle-dash"
+
+# Fine-grained PAT, scoped to this repo only, Contents: Read.
+# No expiry-free tokens: set a reminder to rotate it.
+GITHUB_TOKEN="github_pat_..."
+
+REFRESH_SECONDS=3600
+
+# Skip refreshes between these hours (24h clock).
+QUIET_START=23
+QUIET_END=6

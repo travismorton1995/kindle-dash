@@ -1,0 +1,4 @@
+icalendar>=6.0
+recurring-ical-events>=3.2
+playwright>=1.45
+pillow>=10.3
