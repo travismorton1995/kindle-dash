@@ -1,4 +1,5 @@
 name: Render dashboard
+# (touched to force GitHub to re-scan this file as a workflow)
 
 on:
   schedule:
