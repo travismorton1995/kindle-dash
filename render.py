@@ -204,7 +204,7 @@ def get_weather(now):
         "&current=temperature_2m,apparent_temperature,weather_code"
         "&hourly=temperature_2m,weather_code"
         "&daily=temperature_2m_max,temperature_2m_min,weather_code,"
-        "precipitation_probability_max,sunrise,sunset"
+        "precipitation_probability_max,precipitation_sum,sunrise,sunset"
         "&forecast_days=2"
         f"&timezone={TZ.key.replace('/', '%2F')}"
     )
@@ -222,7 +222,7 @@ def get_weather(now):
                 "hour": when, "temp": round(temp), "code": code,
                 "is_night": is_night(when, sunrise_dt, sunset_dt),
             })
-            if len(upcoming) == 7:
+            if len(upcoming) == 5:
                 break
 
     return {
@@ -234,6 +234,7 @@ def get_weather(now):
         "high": round(daily["temperature_2m_max"][0]),
         "low": round(daily["temperature_2m_min"][0]),
         "pop": daily["precipitation_probability_max"][0] or 0,
+        "precip_mm": daily["precipitation_sum"][0] or 0,
         "sunrise": fmt_sun(sunrise_dt),
         "sunset": fmt_sun(sunset_dt),
         "tmr_high": round(daily["temperature_2m_max"][1]),
@@ -323,7 +324,7 @@ def build_html(weather, timed, allday, tomorrow, tomorrow_allday, now):
 
     hourly_html = "".join(
         f'<div class="hr"><span class="hlabel">{fmt_hour_label(h["hour"])}</span>'
-        f'{weather_icon(h["code"], size=40, night=h["is_night"])}'
+        f'{weather_icon(h["code"], size=54, night=h["is_night"])}'
         f'<span class="htemp">{h["temp"]}&deg;</span></div>'
         for h in weather["hourly"]
     )
@@ -361,12 +362,13 @@ def build_html(weather, timed, allday, tomorrow, tomorrow_allday, now):
         .replace("{{HIGH}}", str(weather["high"]))
         .replace("{{LOW}}", str(weather["low"]))
         .replace("{{POP}}", str(weather["pop"]))
+        .replace("{{PRECIPMM}}", f'<b>{weather["precip_mm"]:.1f}mm</b>' if weather["precip_mm"] > 0 else "")
         .replace("{{SUNRISE}}", weather["sunrise"])
         .replace("{{SUNSET}}", weather["sunset"])
         .replace("{{HOURLY}}", hourly_html)
         .replace("{{EVENTS}}", "".join(rows))
         .replace("{{ALLDAY}}", chips_html(allday))
-        .replace("{{TMRICON}}", weather_icon(weather["tmr_code"], size=42))
+        .replace("{{TMRICON}}", weather_icon(weather["tmr_code"], size=46))
         .replace("{{TMRLABEL}}", weather["tmr_label"])
         .replace("{{TMRHIGH}}", str(weather["tmr_high"]))
         .replace("{{TMRLOW}}", str(weather["tmr_low"]))

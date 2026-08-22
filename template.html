@@ -40,7 +40,7 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
 
 .label {
   font-variation-settings: "wdth" 100, "wght" 700;
-  font-size: 20px;
+  font-size: 23px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--mid);
@@ -90,29 +90,29 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
 
 .cond {
   font-variation-settings: "wdth" 75, "wght" 600;
-  font-size: 40px;
+  font-size: 46px;
   line-height: 1.05;
   margin-bottom: 14px;
 }
 
-.stats { display: flex; gap: 18px; }
+.stats { display: flex; gap: 16px; }
 
 .stat { display: flex; flex-direction: column; gap: 4px; }
 
 .stat b {
   font-variation-settings: "wdth" 100, "wght" 700;
-  font-size: 26px;
+  font-size: 30px;
   white-space: nowrap;
 }
 
 .stat.big b {
   font-variation-settings: "wdth" 120, "wght" 800;
-  font-size: 46px;
+  font-size: 52px;
 }
 
 .stat.sun b {
   font-variation-settings: "wdth" 90, "wght" 700;
-  font-size: 25px;
+  font-size: 28px;
   line-height: 1.15;
 }
 
@@ -135,13 +135,13 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
 
 .hr .hlabel {
   font-variation-settings: "wdth" 100, "wght" 700;
-  font-size: 30px;
+  font-size: 38px;
   color: var(--mid);
 }
 
 .hr .htemp {
   font-variation-settings: "wdth" 110, "wght" 700;
-  font-size: 30px;
+  font-size: 38px;
 }
 
 /* ---------- all-day ---------- */
@@ -154,14 +154,20 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
   margin-bottom: 18px;
 }
 
+/* Full black fill used to dominate the page next to the quieter timed
+   events below it. Matching the same white-bg / left-border language as
+   .aevent puts all-day events in the same visual weight class as timed
+   ones, so neither one shouts over the other -- the NOW divider stays the
+   only fully-black element on the page. */
 .chip {
   display: block;
   width: 100%;
   font-variation-settings: "wdth" 75, "wght" 700;
-  font-size: 33px;
-  padding: 17px 18px;
-  background: var(--ink);
-  color: var(--paper);
+  font-size: 36px;
+  padding: 15px 18px 15px 25px;
+  border-left: 7px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
 }
 
 /* ---------- agenda ---------- */
@@ -181,9 +187,9 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
 
 .aevent .time {
   font-variation-settings: "wdth" 100, "wght" 700;
-  font-size: 27px;
+  font-size: 31px;
   color: var(--mid);
-  width: 104px;
+  width: 112px;
   flex-shrink: 0;
   text-align: right;
 }
@@ -192,13 +198,13 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
 
 .aevent .title {
   font-variation-settings: "wdth" 75, "wght" 700;
-  font-size: 35px;
+  font-size: 38px;
   line-height: 1.15;
 }
 
 .aevent .loc {
   font-variation-settings: "wdth" 75, "wght" 400;
-  font-size: 25px;
+  font-size: 28px;
   color: var(--mid);
   margin-top: 3px;
 }
@@ -219,7 +225,7 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
 
 .nowrow .tag {
   font-variation-settings: "wdth" 100, "wght" 800;
-  font-size: 28px;
+  font-size: 31px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -240,7 +246,7 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
   margin-bottom: 14px;
 }
 
-.tomorrow-head .label { font-size: 22px; }
+.tomorrow-head .label { font-size: 24px; }
 
 .tomorrow-wx-wrap {
   display: flex;
@@ -250,27 +256,33 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
 
 .tomorrow-wx {
   font-variation-settings: "wdth" 75, "wght" 600;
-  font-size: 31px;
+  font-size: 35px;
 }
 
+/* Same time-column width/alignment and title styling as .aevent above, so
+   today's and tomorrow's lists read as one consistent system rather than
+   two differently-styled ones. */
 .trow {
   display: flex;
-  gap: 18px;
-  padding: 8px 0;
   align-items: baseline;
+  gap: 20px;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--rule);
 }
 
 .trow .ttime {
   font-variation-settings: "wdth" 100, "wght" 700;
-  font-size: 27px;
+  font-size: 31px;
   color: var(--mid);
-  width: 94px;
+  width: 112px;
   flex-shrink: 0;
+  text-align: right;
 }
 
 .trow .ttitle {
-  font-variation-settings: "wdth" 75, "wght" 500;
-  font-size: 31px;
+  font-variation-settings: "wdth" 75, "wght" 700;
+  font-size: 38px;
+  line-height: 1.15;
 }
 
 .trow .dim { color: var(--mid); }
@@ -281,7 +293,7 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
   justify-content: flex-end;
 }
 
-.footer .label { font-size: 26px; }
+.footer .label { font-size: 29px; }
 </style>
 </head>
 <body>
@@ -300,7 +312,7 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
         <div class="stat big"><span class="label">High</span><b>{{HIGH}}°</b></div>
         <div class="stat big"><span class="label">Low</span><b>{{LOW}}°</b></div>
         <div class="stat"><span class="label">Feels</span><b>{{FEELS}}°</b></div>
-        <div class="stat"><span class="label">Precip</span><b>{{POP}}%</b></div>
+        <div class="stat"><span class="label">Precip</span><b>{{POP}}%</b>{{PRECIPMM}}</div>
         <div class="stat sun"><span class="label">Sun</span><b>{{SUNRISE}}</b><b>{{SUNSET}}</b></div>
       </div>
     </div>
