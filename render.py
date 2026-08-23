@@ -313,10 +313,9 @@ def build_html(weather, timed, allday, tomorrow, tomorrow_allday, now):
         if not inserted and now < e["start"]:
             rows.append(now_marker)
             inserted = True
-        past = "past" if e["end"] < now else ""
         loc = f'<div class="loc">{esc(e["loc"])}</div>' if e["loc"] else ""
         rows.append(
-            f'<div class="aevent {past}"><span class="time">{fmt_time(e["start"])}</span>'
+            f'<div class="aevent"><span class="time">{fmt_time(e["start"])}</span>'
             f'<div class="body"><div class="title">{esc(e["title"])}</div>{loc}</div></div>'
         )
     if not inserted:
