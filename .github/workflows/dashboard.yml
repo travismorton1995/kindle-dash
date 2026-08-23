@@ -2,20 +2,21 @@ name: Render dashboard
 
 on:
   schedule:
-    # Every 20 min, but only 7am-11pm America/Toronto -- matches
-    # QUIET_START/QUIET_END in kindle/config.sh, so we're not rendering and
-    # pushing images all night that the Kindle's own quiet-hours skip means
-    # it will never fetch.
+    # Every 20 min, 6am-11pm America/Toronto. Starts an hour before the
+    # Kindle's own QUIET_END (7am in kindle/config.sh) on purpose: by the
+    # time the Kindle wakes for its first fetch of the day, there's already
+    # been a render or two, instead of it grabbing the last pre-quiet-hours
+    # image from the night before while Actions catches up.
     #
     # cron is UTC-only and doesn't shift for DST, so this is hardcoded to
-    # the current EDT offset (UTC-4): 7:00-22:59 EDT = 11:00-02:59 UTC.
+    # the current EDT offset (UTC-4): 6:00-22:59 EDT = 10:00-02:59 UTC.
     # During EST (UTC-5, roughly early Nov-mid Mar) this drifts an hour
-    # late; shift to "12-23,0-3" then, or just accept a late start/early
+    # late; shift to "11-23,0-3" then, or just accept a late start/early
     # stop each night for that half of the year.
     #
     # GitHub's cron has a 5-minute floor and fires late under load, which
     # is fine for weather and a calendar.
-    - cron: "5,25,45 11-23,0-2 * * *"
+    - cron: "5,25,45 10-23,0-2 * * *"
   workflow_dispatch:
 
 permissions:
