@@ -302,7 +302,7 @@ def build_html(weather, timed, allday, tomorrow, tomorrow_allday, now):
     rows = []
     now_marker = (
         '<div class="nowrow"><span class="bar"></span>'
-        f'<span class="tag">Now &middot; {fmt_clock(now)}</span>'
+        '<span class="tag">Now</span>'
         '<span class="bar"></span></div>'
     )
     if not timed:
