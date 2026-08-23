@@ -222,7 +222,7 @@ def get_weather(now):
                 "hour": when, "temp": round(temp), "code": code,
                 "is_night": is_night(when, sunrise_dt, sunset_dt),
             })
-            if len(upcoming) == 5:
+            if len(upcoming) == 7:
                 break
 
     return {
@@ -323,7 +323,7 @@ def build_html(weather, timed, allday, tomorrow, tomorrow_allday, now):
 
     hourly_html = "".join(
         f'<div class="hr"><span class="hlabel">{fmt_hour_label(h["hour"])}</span>'
-        f'{weather_icon(h["code"], size=54, night=h["is_night"])}'
+        f'{weather_icon(h["code"], size=60, night=h["is_night"])}'
         f'<span class="htemp">{h["temp"]}&deg;</span></div>'
         for h in weather["hourly"]
     )
@@ -367,7 +367,7 @@ def build_html(weather, timed, allday, tomorrow, tomorrow_allday, now):
         .replace("{{HOURLY}}", hourly_html)
         .replace("{{EVENTS}}", "".join(rows))
         .replace("{{ALLDAY}}", chips_html(allday))
-        .replace("{{TMRICON}}", weather_icon(weather["tmr_code"], size=46))
+        .replace("{{TMRICON}}", weather_icon(weather["tmr_code"], size=54))
         .replace("{{TMRLABEL}}", weather["tmr_label"])
         .replace("{{TMRHIGH}}", str(weather["tmr_high"]))
         .replace("{{TMRLOW}}", str(weather["tmr_low"]))
