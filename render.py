@@ -139,17 +139,31 @@ WEATHER_ICON_SVG = {
         '<g fill="#fff">' + _cloud(10, 23.2, 52, 31.8) + '</g>'
         + _cloud(14, 24.1, 44, 26.9)
     ),
+    # No cloud: fog is the atmospheric condition itself, not something
+    # falling from a cloud, and a cloud + horizontal bars read as a barcode
+    # glued on. Three lines of varying length, fading from solid black (near)
+    # to light gray (far), suggest thinning haze instead of a stripe pattern.
     "fog": (
-        _CLOUD_TOP +
-        '<g stroke="#000" stroke-width="5" stroke-linecap="round">'
-        '<line x1="10" y1="42" x2="54" y2="42"/><line x1="14" y1="51" x2="50" y2="51"/>'
-        '<line x1="18" y1="60" x2="46" y2="60"/></g>'
+        '<line x1="16" y1="18" x2="48" y2="18" stroke="#000" stroke-width="10" stroke-linecap="round"/>'
+        '<line x1="8" y1="33" x2="56" y2="33" stroke="#6e6e6e" stroke-width="10" stroke-linecap="round"/>'
+        '<line x1="20" y1="48" x2="44" y2="48" stroke="#b4b4b4" stroke-width="10" stroke-linecap="round"/>'
     ),
+    # Drops sit in front of the cloud, overlapping its bottom edge, with a
+    # white halo (drawn wider, underneath the real drops) giving each one a
+    # clean margin against the black cloud -- same technique as the sun/moon
+    # peeking-out icons, applied to lines instead of circles/polygons. All
+    # five share one consistent left-leaning diagonal (not independent
+    # angles), with a deliberate size progression across drops 2-4.
     "rain": (
         _CLOUD_TOP +
-        '<g stroke="#000" stroke-width="5" stroke-linecap="round">'
-        '<line x1="22" y1="38" x2="17" y2="54"/><line x1="34" y1="38" x2="29" y2="54"/>'
-        '<line x1="46" y1="38" x2="41" y2="54"/></g>'
+        '<g stroke="#fff" stroke-width="6" stroke-linecap="round">'
+        '<line x1="16" y1="30" x2="10.5" y2="40"/><line x1="25" y1="31" x2="18.9" y2="42"/>'
+        '<line x1="34" y1="29" x2="25.2" y2="45"/><line x1="43" y1="31" x2="33.6" y2="48"/>'
+        '<line x1="51" y1="30" x2="44.4" y2="42"/></g>'
+        '<g stroke="#000" stroke-width="3.5" stroke-linecap="round">'
+        '<line x1="16" y1="30" x2="10.5" y2="40"/><line x1="25" y1="31" x2="18.9" y2="42"/>'
+        '<line x1="34" y1="29" x2="25.2" y2="45"/><line x1="43" y1="31" x2="33.6" y2="48"/>'
+        '<line x1="51" y1="30" x2="44.4" y2="42"/></g>'
     ),
     # A standalone 6-armed snowflake rather than a cloud + dots: reads
     # unambiguously as snow at a glance instead of looking like drizzle.
@@ -172,9 +186,14 @@ WEATHER_ICON_SVG = {
         '<line x1="40.5" y1="17.3" x2="40.5" y2="9.3"/><line x1="40.5" y1="17.3" x2="47.4" y2="13.3"/>'
         '</g>'
     ),
+    # Bolt sits in front of the cloud, overlapping only its bottom edge
+    # (most of the bolt hangs below in clear space), with a thin white
+    # halo -- same in-front-of-cloud technique as rain's drops.
     "storm": (
         _CLOUD_TOP +
-        '<polygon points="34,36 22,54 30,54 26,64 46,42 36,42"/>'
+        '<polygon points="31.7,26.0 42.3,26.0 36.1,39.6 44.8,39.6 28.0,58.2 32.4,43.4 23.7,43.4" '
+        'fill="#fff" stroke="#fff" stroke-width="3" stroke-linejoin="miter"/>'
+        '<polygon points="31.7,26.0 42.3,26.0 36.1,39.6 44.8,39.6 28.0,58.2 32.4,43.4 23.7,43.4"/>'
     ),
 }
 
