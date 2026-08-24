@@ -108,10 +108,10 @@ WEATHER_ICON_SVG = {
         '</g>'
     ),
     "cloud-sun": (
-        '<circle cx="24" cy="22" r="10"/>'
+        '<circle cx="27" cy="25" r="10"/>'
         '<g stroke="#000" stroke-width="4" stroke-linecap="round">'
-        '<line x1="24" y1="2" x2="24" y2="8"/><line x1="4" y1="22" x2="10" y2="22"/>'
-        '<line x1="10" y1="8" x2="14" y2="12"/><line x1="38" y1="8" x2="34" y2="12"/>'
+        '<line x1="27" y1="5" x2="27" y2="11"/><line x1="7" y1="25" x2="13" y2="25"/>'
+        '<line x1="13" y1="11" x2="17" y2="15"/><line x1="41" y1="11" x2="37" y2="15"/>'
         '</g>'
         # A slightly larger white "halo" copy of the cloud, drawn as one
         # filled pass so its own overlapping circles merge seamlessly, then
@@ -134,8 +134,8 @@ WEATHER_ICON_SVG = {
         # cloud-sun: a crescent has no rays poking out past its own
         # silhouette, so it needs more real separation to read at all
         # instead of being swallowed by the cloud's occlusion.
-        '<circle cx="19" cy="15" r="12"/>'
-        '<circle cx="25" cy="10" r="10" fill="#fff"/>'
+        '<circle cx="22" cy="18" r="12"/>'
+        '<circle cx="28" cy="13" r="10" fill="#fff"/>'
         '<g fill="#fff">' + _cloud(10, 23.2, 52, 31.8) + '</g>'
         + _cloud(14, 24.1, 44, 26.9)
     ),
