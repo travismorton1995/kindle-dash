@@ -370,7 +370,7 @@ def build_html(weather, timed, allday, tomorrow, tomorrow_allday, now):
     else:
         tmr = ""
 
-    template = (HERE / "template.html").read_text()
+    template = (HERE / "template.html").read_text(encoding="utf-8")
     return (
         template
         .replace("{{DATE}}", now.strftime("%A").upper())
@@ -404,7 +404,7 @@ def esc(s):
 
 def shoot(html, out_path):
     tmp = HERE / "_render.html"
-    tmp.write_text(html)
+    tmp.write_text(html, encoding="utf-8")
     with sync_playwright() as p:
         b = p.chromium.launch()
         page = b.new_page(viewport={"width": WIDTH, "height": HEIGHT},
