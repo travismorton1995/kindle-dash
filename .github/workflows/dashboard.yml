@@ -8,15 +8,16 @@ on:
     # been a render or two, instead of it grabbing the last pre-quiet-hours
     # image from the night before while Actions catches up.
     #
-    # cron is UTC-only and doesn't shift for DST, so this is hardcoded to
-    # the current EDT offset (UTC-4): 6:00-22:59 EDT = 10:00-02:59 UTC.
-    # During EST (UTC-5, roughly early Nov-mid Mar) this drifts an hour
-    # late; shift to "11-23,0-3" then, or just accept a late start/early
-    # stop each night for that half of the year.
+    # cron is UTC-only and doesn't shift for DST, so this window is
+    # deliberately wider than 6am-11pm local: it's the union of the EDT
+    # (UTC-4) and EST (UTC-5) versions of that range, 10:00-03:59 UTC. The
+    # "Check active hours" step below does the real filtering against
+    # actual local time, so the schedule stays correct year-round without
+    # editing the cron for DST.
     #
     # GitHub's cron has a 5-minute floor and fires late under load, which
     # is fine for weather and a calendar.
-    - cron: "5,25,45 10-23,0-2 * * *"
+    - cron: "5,25,45 10-23,0-3 * * *"
   workflow_dispatch:
 
 permissions:
@@ -32,9 +33,26 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      # The cron trigger fires on a UTC window wide enough to cover both
+      # EDT and EST (see comment above). This step narrows that down to
+      # the real 6am-11pm local target using actual wall-clock time, so
+      # a run outside that window (the ~1hr of slack on each end) is a
+      # no-op instead of an early/late render.
+      - name: Check active hours
+        id: check
+        run: |
+          hour=$(TZ="${{ vars.TIMEZONE || 'America/Toronto' }}" date +%H)
+          if [ "$hour" -ge 6 ] && [ "$hour" -le 22 ]; then
+            echo "active=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "active=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.check.outputs.active == 'true'
 
       - uses: actions/setup-python@v5
+        if: steps.check.outputs.active == 'true'
         with:
           python-version: "3.12"
           cache: pip
@@ -44,17 +62,20 @@ jobs:
       # fresh runner. Keyed to requirements.txt so a playwright version bump
       # invalidates it automatically.
       - name: Cache Playwright browser
+        if: steps.check.outputs.active == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}
 
       - name: Install dependencies
+        if: steps.check.outputs.active == 'true'
         run: |
           pip install -r requirements.txt
           python -m playwright install --with-deps chromium
 
       - name: Render
+        if: steps.check.outputs.active == 'true'
         env:
           ICS_URL: ${{ secrets.ICS_URL }}
           LATITUDE: ${{ vars.LATITUDE }}
@@ -63,6 +84,7 @@ jobs:
         run: python render.py
 
       - name: Publish to output branch
+        if: steps.check.outputs.active == 'true'
         run: |
           set -euo pipefail
           mkdir -p /tmp/publish
