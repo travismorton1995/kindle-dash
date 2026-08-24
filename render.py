@@ -70,14 +70,32 @@ WMO_ICON = {
     95: "storm", 96: "storm", 99: "storm",
 }
 
-# Shared cloud silhouette (a rounded bar plus three overlapping circles)
-# used as the base of every cloud-derived icon, positioned in the upper
-# half of the 64x64 viewBox so accents (rain/snow/bolt/mist) sit below it.
-_CLOUD_TOP = (
-    '<rect x="12" y="20" width="40" height="13" rx="6.5"/>'
-    '<circle cx="24" cy="18" r="13"/><circle cx="34" cy="15" r="15"/>'
-    '<circle cx="44" cy="18" r="12"/>'
-)
+# Shared cloud silhouette: a flat-bottomed base plus three overlapping
+# circles -- a small lobe lower-left, a medium lobe upper-left, and a
+# dominant (tallest) lobe upper-right-of-center -- the classic rounded
+# 3-lobe cloud glyph. Deep overlaps between adjacent lobes keep the
+# outline smooth with no notches where they meet. Takes the silhouette's
+# bounding box (x, y) to (x+w, y+h) so every cloud-derived icon can place
+# it at a consistent ~1.6:1 (wider-than-tall) aspect ratio while still
+# anchoring left/right/bottom edges to wherever that icon's other
+# elements (rain/snow/bolt/mist/sun/moon) expect the cloud to sit.
+def _cloud(x, y, w, h):
+    rect_w, rect_h = w * 0.96, h * 0.45
+    rect_x, rect_y = x + w * 0.04, y + h - h * 0.45
+    return (
+        f'<rect x="{rect_x:.1f}" y="{rect_y:.1f}" width="{rect_w:.1f}" '
+        f'height="{rect_h:.1f}" rx="{rect_h / 2:.1f}"/>'
+        f'<circle cx="{x + w * 0.20:.1f}" cy="{y + h * 0.62:.1f}" r="{h * 0.31:.1f}"/>'
+        f'<circle cx="{x + w * 0.39:.1f}" cy="{y + h * 0.41:.1f}" r="{h * 0.38:.1f}"/>'
+        f'<circle cx="{x + w * 0.70:.1f}" cy="{y + h * 0.48:.1f}" r="{h * 0.48:.1f}"/>'
+    )
+
+
+# Bounding boxes (x, y, w, h) for each cloud appearance below, chosen to
+# keep the same left/right/bottom anchoring the old hand-tuned shapes
+# had -- so rain/snow/bolt/mist/sun/moon accents stay correctly
+# positioned relative to the new silhouette.
+_CLOUD_TOP = _cloud(11, 5.5, 45, 27.5)
 
 WEATHER_ICON_SVG = {
     "sun": (
@@ -100,20 +118,10 @@ WEATHER_ICON_SVG = {
         # the real cloud on top at normal size. That leaves a clean margin
         # around the cloud's outer silhouette without seams where the cloud
         # overlaps itself.
-        '<g fill="#fff">'
-        '<rect x="10" y="32" width="50" height="23" rx="11.5"/>'
-        '<circle cx="25" cy="33" r="15"/><circle cx="37" cy="28" r="18"/>'
-        '<circle cx="48" cy="34" r="14"/>'
-        '</g>'
-        '<rect x="14" y="36" width="42" height="15" rx="7.5"/>'
-        '<circle cx="25" cy="33" r="11"/><circle cx="37" cy="28" r="14"/>'
-        '<circle cx="48" cy="34" r="10"/>'
+        '<g fill="#fff">' + _cloud(10, 23.2, 52, 31.8) + '</g>'
+        + _cloud(14, 24.1, 44, 26.9)
     ),
-    "cloud": (
-        '<rect x="8" y="26" width="48" height="18" rx="9"/>'
-        '<circle cx="21" cy="22" r="13"/><circle cx="35" cy="17" r="17"/>'
-        '<circle cx="49" cy="22" r="12"/>'
-    ),
+    "cloud": _cloud(8, 11.6, 53, 32.4),
     # Crescents: a solid circle with a second, offset circle in paper-white
     # drawn on top to bite out the crescent shape. Same halo-style technique
     # as the cloud icons -- no strokes/gradients, just two solid fills.
@@ -128,14 +136,8 @@ WEATHER_ICON_SVG = {
         # instead of being swallowed by the cloud's occlusion.
         '<circle cx="19" cy="15" r="12"/>'
         '<circle cx="25" cy="10" r="10" fill="#fff"/>'
-        '<g fill="#fff">'
-        '<rect x="10" y="32" width="50" height="23" rx="11.5"/>'
-        '<circle cx="25" cy="33" r="15"/><circle cx="37" cy="28" r="18"/>'
-        '<circle cx="48" cy="34" r="14"/>'
-        '</g>'
-        '<rect x="14" y="36" width="42" height="15" rx="7.5"/>'
-        '<circle cx="25" cy="33" r="11"/><circle cx="37" cy="28" r="14"/>'
-        '<circle cx="48" cy="34" r="10"/>'
+        '<g fill="#fff">' + _cloud(10, 23.2, 52, 31.8) + '</g>'
+        + _cloud(14, 24.1, 44, 26.9)
     ),
     "fog": (
         _CLOUD_TOP +
