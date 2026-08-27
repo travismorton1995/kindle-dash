@@ -335,8 +335,11 @@ def build_html(weather, timed, allday, tomorrow, tomorrow_allday, now):
             rows.append(now_marker)
             inserted = True
         loc = f'<div class="loc">{esc(e["loc"])}</div>' if e["loc"] else ""
+        # Ongoing (start <= now < end) or starting within the hour: one
+        # combined state, not two, so it doesn't compete with the NOW bar.
+        imminent = " soon" if e["start"] <= now + dt.timedelta(hours=1) and e["end"] > now else ""
         rows.append(
-            f'<div class="aevent"><span class="time">{fmt_time(e["start"])}</span>'
+            f'<div class="aevent{imminent}"><span class="time">{fmt_time(e["start"])}</span>'
             f'<div class="body"><div class="title">{esc(e["title"])}</div>{loc}</div></div>'
         )
     if not inserted:

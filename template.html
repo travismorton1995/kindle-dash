@@ -209,6 +209,19 @@ body { padding: var(--pad); display: flex; flex-direction: column; }
   margin-top: 3px;
 }
 
+/* Ongoing or starting within the hour: a bold pill outline is enough to
+   catch the eye without relying on colour, and stays quieter than the
+   NOW bar's solid fill so that stays the loudest thing on the page. The
+   negative horizontal margin balances the added padding so the row's
+   time/title columns stay aligned with the rows around it -- the pill
+   grows outward instead of pushing its own content inward. */
+.aevent.soon {
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  padding: 15px 28px;
+  margin: 8px -28px;
+}
+
 .title.dim { color: var(--mid); }
 
 .nowrow {
