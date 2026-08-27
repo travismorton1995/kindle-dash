@@ -78,12 +78,18 @@ jobs:
         if: steps.check.outputs.active == 'true'
         env:
           ICS_URL: ${{ secrets.ICS_URL }}
-          LATITUDE: ${{ vars.LATITUDE }}
-          LONGITUDE: ${{ vars.LONGITUDE }}
+          LATITUDE: ${{ secrets.LATITUDE }}
+          LONGITUDE: ${{ secrets.LONGITUDE }}
           TIMEZONE: ${{ vars.TIMEZONE }}
         run: python render.py
 
-      - name: Publish to output branch
+      # TEMPORARY dual-publish during the kindle-dash-output migration: the
+      # Kindle in the field still fetches from this repo's `output` branch
+      # until its on-device config.sh/token get repointed at the new repo.
+      # Remove this step once that switch is confirmed -- keeping both
+      # around after that just re-exposes the image on this repo for no
+      # reason once it goes public.
+      - name: Publish to output branch (legacy, remove after device cutover)
         if: steps.check.outputs.active == 'true'
         run: |
           set -euo pipefail
@@ -101,3 +107,44 @@ jobs:
           git push -q --force \
             "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
             output
+
+      # Real destination going forward: a dedicated private repo, so the
+      # rendered image (real calendar event titles, effectively a live
+      # schedule) never lands anywhere kindle-dash's own visibility affects.
+      - name: Publish to output repo
+        if: steps.check.outputs.active == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/publish-private
+          cp dash.png /tmp/publish-private/
+          cd /tmp/publish-private
+          git init -q
+          git checkout -q -b main
+          git config user.name "dashboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add dash.png
+          git commit -qm "dashboard $(date -u +%FT%TZ)"
+          git push -q --force \
+            "https://x-access-token:${{ secrets.OUTPUT_REPO_TOKEN }}@github.com/travismorton1995/kindle-dash-output.git" \
+            main
+
+      # Keeps kindle-dash itself from going 60 days without activity, which
+      # public repos auto-disable scheduled workflows for. Harmless while
+      # still private; needed once it goes public, since the real publish
+      # traffic will have moved to kindle-dash-output by then.
+      - name: Heartbeat
+        if: steps.check.outputs.active == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/heartbeat
+          date -u +%FT%TZ > /tmp/heartbeat/heartbeat.txt
+          cd /tmp/heartbeat
+          git init -q
+          git checkout -q -b heartbeat
+          git config user.name "dashboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add heartbeat.txt
+          git commit -qm "heartbeat $(date -u +%FT%TZ)"
+          git push -q --force \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+            heartbeat
