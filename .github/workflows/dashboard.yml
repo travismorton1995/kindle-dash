@@ -105,12 +105,13 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/publish-private
           cp dash.png /tmp/publish-private/
+          cp output-repo-readme.md /tmp/publish-private/README.md
           cd /tmp/publish-private
           git init -q
           git checkout -q -b main
           git config user.name "dashboard-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add dash.png
+          git add dash.png README.md
           git commit -qm "dashboard $(date -u +%FT%TZ)"
           git push -q --force \
             "https://x-access-token:${{ secrets.OUTPUT_REPO_TOKEN }}@github.com/travismorton1995/kindle-dash-output.git" \
