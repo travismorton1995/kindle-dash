@@ -2,13 +2,13 @@
 
 Weather and calendar dashboard for a jailbroken Kindle Paperwhite 4 (1072×1448).
 GitHub Actions renders a PNG every 20 minutes into a private branch; the Kindle
-wakes on an RTC alarm every 30 minutes, fetches whatever's newest, draws it,
+wakes on an RTC alarm every 20 minutes, fetches whatever's newest, draws it,
 and suspends.
 
 No always-on machine, no third-party subscription, no calendar data on a public URL.
 
 ```
-Actions (every 20 min)              Kindle (every 30 min)
+Actions (every 20 min)              Kindle (every 20 min)
   Open-Meteo ─┐                       wake on RTC alarm
   your .ics ──┼─→ HTML → Chromium     wifi on
               │   screenshot →        curl the PNG (token auth)

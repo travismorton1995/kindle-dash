@@ -7,7 +7,7 @@ Project context for Claude Code. Read this before changing anything.
 A weather and calendar dashboard for a **jailbroken Kindle Paperwhite 4 (10th gen)**.
 GitHub Actions renders a PNG every 20 minutes (during the Kindle's active
 hours only — see the `dashboard.yml` cron) and pushes it to a private branch.
-The Kindle wakes on an RTC alarm every 30 minutes and fetches whatever's
+The Kindle wakes on an RTC alarm every 20 minutes and fetches whatever's
 newest — the two cadences don't need to match, the Kindle just always grabs
 the latest available render. It draws the PNG with `eips` and
 suspends to RAM.
@@ -134,19 +134,134 @@ Verified on a real jailbroken PW4 (2026-08-21):
   a limited debug font, not a real character set. Keep any eips-drawn
   overlay text near the top of the screen and free of unusual punctuation.
 
+Verified 2026-08-24:
+
+- **Power button already works as a manual refresh — no code needed.**
+  `sleep_until_next()` doesn't check *why* `echo mem > /sys/power/state`
+  returned, so any wake source (RTC alarm or power button) drops straight
+  into the top of the loop and runs a normal fetch/draw cycle, then re-arms
+  the RTC from that new "now." Confirmed on-device: pressing power while
+  asleep redrew the screen with the latest image in ~20s. One known gap —
+  during `QUIET_START`–`QUIET_END` this still no-ops like a scheduled wake
+  would, so a power-button press overnight currently does nothing — decided
+  to leave it that way rather than add a bypass (2026-08-24).
+
+Verified 2026-08-24 (unattended, on battery, ~3 days):
+
+- **Battery life: ~16 days per charge.** 97% Friday afternoon → 80% Monday
+  4:49pm (~74h) is ~5.5%/day. Projected to the 8% auto-cutoff in `dash.sh`,
+  that's roughly 16 days on `REFRESH_SECONDS=1800` (30 min) with
+  `QUIET_START=23`/`QUIET_END=7`. Treat as a ballpark, not exact — li-ion
+  discharge isn't perfectly linear, especially near empty. This closes out
+  the "is 30s a safe wifi-reconnect guess" question by proxy: whatever the
+  real number is, the battery budget has enough headroom that it doesn't
+  matter for now.
+- **Decided (2026-08-25): dropped `REFRESH_SECONDS` to 1200 (20 min)** to
+  match the Actions cadence, using the headroom above. Active-hour fetch
+  cycles go from 32/day to 48/day (1.5x); if drain scales with fetch
+  cycles rather than bare RTC wakes, that's a projected ~11 days/charge
+  instead of ~16 — still comfortable. `config.sh.example` reflects this;
+  the real on-device `config.sh` isn't tracked in git and needs the same
+  edit made by hand over SSH.
+- **Low battery no longer exits awake.** The `<8%` branch in `dash.sh` used
+  to `exit 0` right after drawing the warning, leaving the SoC idling at
+  full power (framework already stopped, nothing else suspends it) for
+  whatever's left of the charge. It now suspends (`echo mem >
+  /sys/power/state`) with no RTC alarm armed, so the tail end of the
+  battery is spent suspended instead of awake — only a physical wake
+  (power button, USB) brings it back, at which point the script has
+  already exited and needs restarting by hand, same as the on-screen
+  message says.
+
 ## Known unknowns
 
 Still open:
 
-- How long wifi takes to reconnect after resume (30s is a guess). Testing
-  so far has been over USB, which appears to interfere with both wifi
-  association and suspend-to-RAM (`echo mem > /sys/power/state` may no-op
-  while USB is attached) — retest unplugged, on battery, before trusting
-  timing measured here.
+- **eips text-mode row ceiling isn't fully mapped.** Row 55 works, row 150
+  overflows (`pixel_in_range` errors) — the real max is somewhere in
+  between, unconfirmed beyond that. Only matters if something new ever
+  needs to draw eips overlay text lower on the screen than the battery
+  readout does today.
 
 When debugging the device, the log is at `/mnt/us/dash.log`. Ask for it rather
 than guessing. It's self-trimming (`trim_log()`, capped at `LOG_MAX_LINES`)
 so it's safe to leave running unattended for weeks without filling storage.
+
+## Known limitation: evening staleness from GitHub's cron queue
+
+Confirmed 2026-08-24 by pulling Actions run history across 4 days and
+converting to local time: there's a highly consistent ~100-120min dead zone
+in the `schedule:` trigger's firing every single day, starting at almost
+exactly 19:56-20:00 America/Toronto (= UTC midnight) and not resuming until
+roughly 21:42-21:56. Same window, four days running — this is UTC-midnight
+congestion on GitHub's shared free-tier cron queue (a huge fraction of
+"daily" jobs across the whole platform fire at `0 0 * * *`), not something
+specific to this repo, and not something the "5-25-45 past the hour" minute
+offsets in `dashboard.yml` can dodge.
+
+Effect: the queue usually manages one render right as it recovers
+(~9:45-9:56pm) and then, some days, one more before the active-hours cutoff
+— so the last image the Kindle displays before quiet hours often really is
+from just before 10pm rather than closer to 11pm. This is the same
+"schedule: is best-effort" limitation already known from earlier research,
+just now pinned to a specific cause and time window rather than generic
+flakiness.
+
+**Optional future path: bypass the `schedule:` queue entirely.**
+`workflow_dispatch` (manual/API-triggered runs) is not subject to this same
+congestion — it fires immediately regardless of what the cron queue is
+doing. So a small always-on device on the home network, hitting
+`POST /repos/{owner}/{repo}/actions/workflows/{id}/dispatches` on its own
+schedule instead of relying on GitHub's `schedule:` trigger, would sidestep
+this specific problem entirely. Candidates discussed:
+
+- **Repurpose an old Raspberry Pi 3** the household already owns as the
+  trigger (not the renderer — keep the actual `render.py`/Playwright work
+  on GitHub Actions' Ubuntu runners; a Pi 3's 1GB RAM makes a poor
+  headless-Chromium host). Effectively free (idle power draw only, no
+  recurring cost), and the dispatch token stays on hardware under direct
+  control rather than a third party's. Tradeoffs: this contradicts the
+  "no always-on machine" framing above, so treat that as superseded if this
+  path is taken; needs a systemd service (not just a login cron) so it
+  survives reboots/power blips, and SD cards wear under 24/7 writes (boot
+  off USB storage if available, or keep writes minimal). Scope the
+  dispatch token to `Actions: write` only on this repo — a different,
+  narrower token than the Kindle's `Contents: Read` one.
+- **n8n Cloud** as a hosted alternative — no hardware to maintain, and its
+  credential storage is genuinely encrypted (AES-256 at rest on Cloud,
+  FIPS-140-2), unlike cron-job.org's plaintext storage which ruled that
+  option out earlier. But n8n dropped its free tier; Cloud pricing starts
+  at $24/mo (2,500 executions), which is hard to justify against a Pi
+  that's already sitting in a drawer.
+
+## Deferred feature: Ecobee room sensors
+
+Wanted (2026-08-25): per-room temperature from Ecobee remote sensors on the
+dashboard — not the main thermostat reading, not humidity, specifically the
+individual sensor breakdown.
+
+Blocked on the same problem as above, for a different reason. Ecobee's API
+has no local/LAN endpoint and no static key — it's an OAuth-style PIN
+pairing flow whose refresh token *rotates on every call*, so it needs
+somewhere to persist state between runs. That's real state this
+architecture doesn't have anywhere for today (same "no token refresh, no
+consent screen, no client secret" principle the calendar integration was
+built around — see Architecture above).
+
+Decided to wait for the Raspberry Pi rather than solve it via GitHub-secret
+auto-rewriting (the other option considered: a second fine-grained PAT
+scoped to `Secrets: write`, with a workflow step that persists Ecobee's
+rotated token after every run — works, but is a new moving part that
+silently breaks re-pairing if a run ever fails mid-chain). Once the Pi
+exists for the cron-trigger project, it's the natural place for the Ecobee
+token too — lives on local disk like any normal app credential, and the Pi
+can just push current sensor readings into the repo for `render.py` to
+pick up, no secret-rewriting involved.
+
+Not started — revisit once the Pi is real.
+
+Not started — revisit if the evening staleness becomes worth solving
+outright rather than living with.
 
 ## Style
 
