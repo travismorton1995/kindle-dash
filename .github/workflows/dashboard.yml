@@ -48,6 +48,19 @@ jobs:
             echo "active=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # GitHub's automatic secret-masking silently fails on short, simple
+      # values (confirmed: LATITUDE/LONGITUDE print in plaintext in every
+      # historical run's log despite being Secrets, right next to ICS_URL
+      # correctly masked as *** -- masking only reliably catches longer,
+      # higher-entropy strings). Registering them explicitly here, before
+      # the Render step's auto-echoed env: block would otherwise print them
+      # raw, is the documented workaround for exactly this case.
+      - name: Mask short secrets
+        if: steps.check.outputs.active == 'true'
+        run: |
+          echo "::add-mask::${{ secrets.LATITUDE }}"
+          echo "::add-mask::${{ secrets.LONGITUDE }}"
+
       - uses: actions/checkout@v4
         if: steps.check.outputs.active == 'true'
 
