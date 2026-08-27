@@ -42,7 +42,7 @@ jobs:
         id: check
         run: |
           hour=$(TZ="${{ vars.TIMEZONE || 'America/Toronto' }}" date +%H)
-          if [ "$hour" -ge 6 ] && [ "$hour" -le 23 ]; then  # TEMP: widened to test masking fix, revert after
+          if [ "$hour" -ge 6 ] && [ "$hour" -le 22 ]; then
             echo "active=true" >> "$GITHUB_OUTPUT"
           else
             echo "active=false" >> "$GITHUB_OUTPUT"
