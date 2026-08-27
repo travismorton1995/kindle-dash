@@ -15,7 +15,10 @@ DIR="$(dirname "$0")"
 IMG=/tmp/dash.png
 LOG=/mnt/us/dash.log
 LOG_MAX_LINES=5000  # a few days of history; keeps the log from growing forever
-API="https://api.github.com/repos/${GITHUB_REPO}/contents/dash.png?ref=output"
+# GITHUB_REPO points at the dedicated private image repo (kindle-dash-output),
+# not the code repo -- separate repos since the code repo is public. Image
+# lives on that repo's default branch (main), force-pushed fresh each render.
+API="https://api.github.com/repos/${GITHUB_REPO}/contents/dash.png?ref=main"
 exec >>"$LOG" 2>&1
 
 log() { echo "$(date '+%F %T') $*" >> "$LOG"; }
@@ -128,6 +131,13 @@ while true; do
     log "battery ${bat}%, stopping"
     eips -c
     eips 5 20 "Battery low (${bat}%) - charge and restart dash"
+    # Suspend instead of exiting awake: without this the SoC idles at full
+    # power (framework's already stopped, nothing else suspends it) right
+    # when battery is at its lowest. No RTC alarm is armed, so only a
+    # physical wake (power button, USB) brings it back -- at which point
+    # this script has already exited and needs restarting by hand, same as
+    # the message says.
+    echo mem > /sys/power/state
     exit 0
   fi
 

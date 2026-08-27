@@ -1,11 +1,13 @@
 # Copy to config.sh on the Kindle and fill in.
-GITHUB_REPO="yourname/kindle-dash"
+# This is the dedicated private image repo, not the (public) code repo --
+# the Kindle never needs to read the code, only the rendered PNG.
+GITHUB_REPO="yourname/kindle-dash-output"
 
-# Fine-grained PAT, scoped to this repo only, Contents: Read.
+# Fine-grained PAT, scoped to GITHUB_REPO above only, Contents: Read.
 # No expiry-free tokens: set a reminder to rotate it.
 GITHUB_TOKEN="github_pat_..."
 
-REFRESH_SECONDS=3600
+REFRESH_SECONDS=1200
 
 # Skip refreshes between these hours (24h clock).
 QUIET_START=23
