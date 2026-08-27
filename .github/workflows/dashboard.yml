@@ -96,32 +96,7 @@ jobs:
           TIMEZONE: ${{ vars.TIMEZONE }}
         run: python render.py
 
-      # TEMPORARY dual-publish during the kindle-dash-output migration: the
-      # Kindle in the field still fetches from this repo's `output` branch
-      # until its on-device config.sh/token get repointed at the new repo.
-      # Remove this step once that switch is confirmed -- keeping both
-      # around after that just re-exposes the image on this repo for no
-      # reason once it goes public.
-      - name: Publish to output branch (legacy, remove after device cutover)
-        if: steps.check.outputs.active == 'true'
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/publish
-          cp dash.png /tmp/publish/
-          cd /tmp/publish
-          git init -q
-          git checkout -q -b output
-          git config user.name "dashboard-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add dash.png
-          git commit -qm "dashboard $(date -u +%FT%TZ)"
-          # Force-push a fresh single-commit branch every time. Without this the
-          # repo would grow by one PNG every 30 minutes, forever.
-          git push -q --force \
-            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
-            output
-
-      # Real destination going forward: a dedicated private repo, so the
+      # Real destination: a dedicated private repo, so the
       # rendered image (real calendar event titles, effectively a live
       # schedule) never lands anywhere kindle-dash's own visibility affects.
       - name: Publish to output repo
