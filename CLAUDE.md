@@ -97,8 +97,13 @@ Confirmed on the Pi (2026-08-27):
   this — that setting matters for `OnCalendar=`-style absolute-time timers,
   not the boot-relative ones used here. Harmless to leave, just don't
   assume it's load-bearing.
-- `sudo` is passwordless for the Pi's user — no interactive prompts needed
-  for systemd/package management over SSH.
+- **`sudo` is *not* passwordless on the Pi** — corrected 2026-08-28. Several
+  early setup commands succeeded without a prompt, which was wrongly taken
+  as a permanent `NOPASSWD` grant; that was actually a cached sudo
+  timestamp riding a session authenticated locally, and it expired.
+  `sudo -n true` now fails outright. Any `sudo` action from an agent
+  session needs the device owner to run it himself, interactively — check
+  with `sudo -n true` first rather than assuming.
 - SSH access details, including the DHCP-IP-drift caveat and the
   Windows/Git-Bash mDNS resolution gotcha, are in this project's memory
   (`kindle_dash_pi_access`), not repeated here since they're
