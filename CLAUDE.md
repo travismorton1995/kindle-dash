@@ -117,9 +117,16 @@ Verified on a real jailbroken PW4 (2026-08-21):
   to keep for ghost-clearing.
 - **`eips -g` must be called with `-f` (full update).** Its default is a
   partial update, which on this hardware attempts an unsupported "swipe"
-  transition and prints debug text (`update_to_display: ...` / `swipe
-  feature is not supported...`) directly onto the screen instead of a
-  legible log. `draw()` in `dash.sh` always passes `-f` now — don't drop it.
+  transition. `draw()` in `dash.sh` always passes `-f` now — don't drop it.
+- **The `update_to_display: ... / swipe feature is not supported in this
+  platfom G2` message is harmless log noise, not a screen-corruption
+  symptom.** Confirmed 2026-08-26: it prints to `dash.log` (via the script's
+  `exec >>$LOG 2>&1`) on *every* `eips` display call each refresh — the
+  `eips -c` clear, the `-f` image draw, and the un-flagged battery-text
+  draw alike, `update_mode=FULL` included — yet the physical screen renders
+  clean with nothing visible. Originally thought `-f` fully suppressed this
+  message (it doesn't, on this hardware); what `-f` actually fixes is the
+  partial-update image draw specifically. Safe to ignore in the log.
 - lipc frontlight property is **`flIntensity`** (camelCase, matching
   `wirelessEnable`/`cmState`/`battLevel`), not `fl_intensity` — the latter
   fails silently with `lipcErrNoSuchProperty`.
