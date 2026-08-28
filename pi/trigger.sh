@@ -28,6 +28,7 @@ log() { echo "$(date '+%F %T') $*" >> "$LOG"; }
 # Same reasoning as dash.sh's trim_log: keeps this safe to run unattended
 # for months without the log growing forever.
 trim_log() {
+  [ -f "$LOG" ] || return
   lines=$(wc -l < "$LOG" 2>/dev/null || echo 0)
   if [ "$lines" -gt "$LOG_MAX_LINES" ]; then
     tail -n "$LOG_MAX_LINES" "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
