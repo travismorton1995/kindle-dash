@@ -259,6 +259,31 @@ Still open:
   between, unconfirmed beyond that. Only matters if something new ever
   needs to draw eips overlay text lower on the screen than the battery
   readout does today.
+- **`dash.sh` restarted spontaneously once, cause unconfirmed (2026-08-28,
+  ~6:35am).** Preceded by a burst of very rapid wake events (7 wakes in
+  under 5.5 minutes, some just seconds apart — not the RTC alarm's normal
+  20-min cadence) with no physical handling of the device at the time
+  (confirmed). Candidates: a kernel-level suspend/resume hang triggering a
+  watchdog reset, or a race in `sleep_until_next()`'s clear-then-set
+  wakealarm sequence causing a spurious immediate wake that cascaded.
+  Neither confirmed — `dmesg` wasn't checked in time to catch kernel-level
+  detail. One-off so far; watch for recurrence rather than chasing it blind
+  from a single instance.
+- **The first `eips` draw after that restart didn't reach the screen,
+  despite `dash.log` showing a clean success.** Screen still showed the
+  previous night's image at 7:25am, 9 minutes after `dash.log` logged
+  `07:16:18 refreshed` with no errors — the eips output for that cycle is
+  byte-for-byte identical to later, confirmed-working ones, so the log
+  gives no visible signal anything was wrong. Recovered on its own by the
+  next cycle and has drawn correctly every cycle since. Plausible
+  mechanism, unconfirmed: `stop lab126_gui` runs once at startup, before
+  the main loop begins — if that teardown hasn't fully released its hold
+  on the display by the time the *first* loop iteration's `eips -g` fires,
+  that draw could get silently swallowed by a not-yet-ready display
+  driver, while every subsequent cycle (teardown long since settled) works
+  fine. Not fixed — self-heals within one ~20-min cycle, only after an
+  already-rare restart, so not worth a defensive change until/unless this
+  recurs and the pattern holds.
 
 When debugging the device, the log is at `/mnt/us/dash.log`. Ask for it rather
 than guessing. It's self-trimming (`trim_log()`, capped at `LOG_MAX_LINES`)
