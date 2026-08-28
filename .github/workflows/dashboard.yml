@@ -45,7 +45,7 @@ jobs:
           h=$(TZ="${{ vars.TIMEZONE || 'America/Toronto' }}" date +%H)
           m=$(TZ="${{ vars.TIMEZONE || 'America/Toronto' }}" date +%M)
           total=$((10#$h * 60 + 10#$m))
-          if [ "$total" -ge 395 ] && [ "$total" -le 1450 ]; then  # TEMP: widened to verify minute-precision logic on the real runner, revert after
+          if [ "$total" -ge 395 ] && [ "$total" -le 1379 ]; then
             echo "active=true" >> "$GITHUB_OUTPUT"
           else
             echo "active=false" >> "$GITHUB_OUTPUT"
