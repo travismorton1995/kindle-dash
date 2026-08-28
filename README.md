@@ -1,13 +1,18 @@
 # kindle-dash
 
 Weather and calendar dashboard for a jailbroken Kindle Paperwhite 4 (1072×1448).
-GitHub Actions renders a PNG every 20 minutes and pushes it to a separate
-private repo; the Kindle wakes on an RTC alarm every 20 minutes, fetches
+A small Raspberry Pi on the home network fires a GitHub Actions render every
+20 minutes; the Kindle wakes on its own RTC alarm every 20 minutes, fetches
 whatever's newest, draws it, and suspends. A power-button press while asleep
 also works as a manual refresh — nothing special about it, it's just another
 wake source into the same loop.
 
-No always-on machine, no third-party subscription, no calendar data on a public URL.
+No third-party subscription, no calendar data on a public URL. **One
+exception to "no always-on machine":** GitHub's own cron trigger for
+Actions turned out to be unreliable enough (and eventually stopped firing
+entirely) that a small always-on device firing the render manually became
+the actual fix, not a nice-to-have — see "The Pi trigger" below before
+assuming this could just go back to a pure cron setup.
 
 This repo (the code) is public — GitHub Actions minutes are unlimited on public
 repos, and there's nothing sensitive in here. The *rendered image* is a
@@ -15,13 +20,17 @@ different story (real calendar event titles, effectively a live schedule), so
 it publishes to a second, private repo instead: **kindle-dash-output**.
 
 ```
-Actions (every 20 min, public repo)     Kindle (every 20 min)
-  Open-Meteo ─┐                           wake on RTC alarm
-  your .ics ──┼─→ HTML → Chromium         wifi on
-              │   screenshot →            curl the PNG from
-              │   16-level grayscale      kindle-dash-output (token auth)
-              └─→ push to                 eips draws it
-                  kindle-dash-output      wifi off → suspend to RAM
+Pi (every 20 min)                     Kindle (every 20 min)
+  workflow_dispatch ──┐                 wake on RTC alarm
+                       │                 wifi on
+                       ▼                 curl the PNG from
+Actions (public repo)                    kindle-dash-output (token auth)
+  Open-Meteo ─┐                          eips draws it
+  your .ics ──┼─→ HTML → Chromium        wifi off → suspend to RAM
+              │   screenshot →
+              │   16-level grayscale
+              └─→ push to
+                  kindle-dash-output
                   (private)
 ```
 
@@ -88,6 +97,41 @@ chmod +x /mnt/us/extensions/dash/dash.sh
 
 Run it once by hand from SSH before wiring it to KUAL or boot, so you can watch
 `/mnt/us/dash.log`.
+
+### 5. The Pi trigger
+
+Not optional in practice, even though GitHub's `schedule:` trigger looks
+like it should make this unnecessary — it's confirmed unreliable (delays
+of 20min-2hrs are common under load) and can stop firing entirely with no
+warning and no fix from GitHub Support. `workflow_dispatch` (a manual/API
+trigger) has been 100% reliable by comparison, so a small always-on device
+calling it directly is the actual fix, not a workaround.
+
+Any always-on Linux box on the same network works; this was built against
+a Raspberry Pi 3. Files live in `pi/`:
+
+```sh
+# on the Pi
+mkdir -p ~/kindle-dash-trigger
+# copy pi/trigger.sh and pi/config.sh (from pi/config.sh.example) into it
+chmod +x ~/kindle-dash-trigger/trigger.sh
+sudo cp pi/kindle-dash-trigger.service pi/kindle-dash-trigger.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now kindle-dash-trigger.timer
+```
+
+`config.sh` needs a fine-grained PAT scoped to **this repo only**,
+`Actions: Read and write` — a third, separate token from the two above (the
+output repo's publish token and the Kindle's read token). `REF` in that
+same file should be `master` (or whichever branch has the workflow).
+
+A systemd **timer**, not cron: `OnBootSec=1min` means it fires
+unconditionally within about a minute of any boot — regardless of how long
+the power was out, or how recently it last ran before that — then
+`OnUnitActiveSec=20min` takes over for steady-state operation. No
+active-hours logic duplicated here; `dashboard.yml`'s own gate already
+handles that, so the Pi just fires every 20 minutes and lets most
+outside-hours calls no-op.
 
 ## Local iteration
 

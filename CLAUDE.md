@@ -6,13 +6,24 @@ Project context for Claude Code. Read this before changing anything.
 
 A weather and calendar dashboard for a **jailbroken Kindle Paperwhite 4 (10th gen)**.
 GitHub Actions renders a PNG every 20 minutes (during the Kindle's active
-hours only — see the `dashboard.yml` cron) and pushes it to a private branch.
-The Kindle wakes on an RTC alarm every 20 minutes and fetches whatever's
-newest — the two cadences don't need to match, the Kindle just always grabs
-the latest available render. It draws the PNG with `eips` and
-suspends to RAM.
+hours only — see `dashboard.yml`'s "Check active hours" step) and pushes it
+to a separate private repo, `kindle-dash-output`. The Kindle wakes on an RTC
+alarm every 20 minutes and fetches whatever's newest from there — the two
+cadences don't need to match, the Kindle just always grabs the latest
+available render. It draws the PNG with `eips` and suspends to RAM.
 
-There is no server. There is no always-on machine. Don't introduce one.
+`kindle-dash` (this repo, the code) is public — unlimited GitHub Actions
+minutes. The rendered image is a different story (real calendar event
+titles, effectively a live schedule), so it lives somewhere that isn't
+world-readable instead.
+
+A small Raspberry Pi 3 on the home network (see "The Pi trigger" below)
+triggers renders via `workflow_dispatch`, standing in for GitHub's own
+`schedule:` trigger — which stopped firing entirely and isn't coming back
+on its own. This is the one exception to "no always-on machine": it's
+narrowly scoped to triggering, not rendering (that's still GitHub Actions),
+and it exists because the alternative genuinely doesn't work — see below
+before assuming it's a design choice that could just be reverted.
 
 ## Hard constraints
 
@@ -36,7 +47,9 @@ These are properties of the hardware, not preferences. Changing them breaks the 
 render.py          fetch data → build HTML → screenshot → quantise → dash.png
 template.html      the layout; placeholders are {{TOKENS}}, replaced by string
                    substitution in build_html(). No template engine.
-.github/workflows/ 20-min cron; force-pushes a single-commit `output` branch
+.github/workflows/ dashboard.yml; force-pushes dash.png to kindle-dash-output
+pi/                trigger.sh + systemd units; runs on the Pi, calls
+                   workflow_dispatch since schedule: doesn't work anymore
 kindle/dash.sh     wake → wifi up → curl → eips → wifi down → suspend
 ```
 
@@ -46,9 +59,50 @@ Data sources:
   `recurring_ical_events`. Deliberately not Google OAuth — no token refresh,
   no consent screen, no client secret.
 
-The `output` branch is force-pushed as a fresh single commit every run. This is
-intentional: without it the repo grows by one PNG every 20 minutes forever. Don't "fix"
-it into a normal commit history.
+`dash.png` is force-pushed as a fresh single commit to `kindle-dash-output`'s
+`main` branch every run. This is intentional: without it that repo would
+grow by one PNG every 20 minutes forever. Don't "fix" it into a normal
+commit history.
+
+`dashboard.yml` still declares a `schedule:` trigger, even though it's
+confirmed dead (see "The Pi trigger" below) — left in deliberately as free
+redundancy in case GitHub ever quietly fixes it, not an oversight. Don't
+remove it, and don't rely on it either.
+
+### The Pi trigger
+
+An old Raspberry Pi 3, reflashed fresh 2026-08-27, runs `kindle-dash-trigger`
+— a systemd timer (`pi/kindle-dash-trigger.timer` + `.service`) that fires
+`pi/trigger.sh` every 20 minutes. That script POSTs to
+`/repos/travismorton1995/kindle-dash/actions/workflows/dashboard.yml/dispatches`
+using a fine-grained PAT scoped to `Actions: write` on this repo only,
+stored in `pi/config.sh` on the Pi (chmod 600, not in git, same pattern as
+`kindle/config.sh`). No active-hours logic duplicated there — `dashboard.yml`'s
+own "Check active hours" step already gates whether a dispatch renders
+anything, so the Pi just fires every 20 minutes regardless and lets most
+outside-hours ones no-op.
+
+Confirmed on the Pi (2026-08-27):
+- **Reboot survival is empirically tested, not assumed.** Rebooted the Pi
+  mid-session and watched the timer auto-start with zero manual
+  intervention, fire on schedule (`OnBootSec=1min`), and successfully
+  dispatch — network was ready in time.
+- **`OnBootSec` fires unconditionally, not based on how overdue the last
+  run was.** The last fire before that reboot was only ~3 minutes earlier
+  (well under the 20-min interval) and it still fired again ~1 min after
+  boot. This is the behavior you want: any power event, regardless of
+  outage length, gets a fresh trigger within about a minute of coming back
+  online, rather than waiting up to 20 minutes for the next slot.
+  `Persistent=true` on the timer isn't actually doing meaningful work given
+  this — that setting matters for `OnCalendar=`-style absolute-time timers,
+  not the boot-relative ones used here. Harmless to leave, just don't
+  assume it's load-bearing.
+- `sudo` is passwordless for the Pi's user — no interactive prompts needed
+  for systemd/package management over SSH.
+- SSH access details, including the DHCP-IP-drift caveat and the
+  Windows/Git-Bash mDNS resolution gotcha, are in this project's memory
+  (`kindle_dash_pi_access`), not repeated here since they're
+  environment-specific rather than project-architecture.
 
 ## Design intent
 
@@ -99,11 +153,22 @@ secret calendar URLs and coordinates, same pattern as `kindle/config.sh`.
 - **Never commit `test.ics` or any calendar data.** It's the full calendar in
   plaintext. It's in `.gitignore`; keep it there.
 - **Never commit `local.sh`.** It holds real secret calendar URLs.
-- **Never commit `kindle/config.sh`.** It holds the GitHub token.
+- **Never commit `kindle/config.sh` or `pi/config.sh`.** They hold GitHub tokens.
 - **Never echo or log `GITHUB_TOKEN`**, including in debug output.
 - **Never suggest `curl -k` / `--insecure` in `dash.sh`.** That request carries
   the token. If TLS fails on the Kindle, the fix is an updated CA bundle.
-- The Kindle's token must stay fine-grained, single-repo, Contents: Read.
+- Every token in this project is fine-grained, single-repo, and scoped to
+  the one permission it actually needs — the Kindle's `Contents: Read` on
+  `kindle-dash-output`, the Actions publish step's `Contents: Read and
+  write` on `kindle-dash-output`, and the Pi trigger's `Actions: write` on
+  `kindle-dash`. Don't consolidate these into one broader token for
+  convenience — that's the whole point of keeping them separate.
+- **GitHub's automatic secret-masking silently fails on short, simple
+  values.** Confirmed: `LATITUDE`/`LONGITUDE` printed in plaintext in every
+  run log despite being registered Secrets, while `ICS_URL` (long, high
+  entropy) masked correctly in the same log. `dashboard.yml` works around
+  this with an explicit `echo "::add-mask::${{ secrets.X }}"` step — keep
+  that step, and use the same pattern for any future short secret.
 
 ## Confirmed on physical device
 
@@ -194,52 +259,53 @@ When debugging the device, the log is at `/mnt/us/dash.log`. Ask for it rather
 than guessing. It's self-trimming (`trim_log()`, capped at `LOG_MAX_LINES`)
 so it's safe to leave running unattended for weeks without filling storage.
 
-## Known limitation: evening staleness from GitHub's cron queue
+## schedule: is dead — history, for context
 
-Confirmed 2026-08-24 by pulling Actions run history across 4 days and
-converting to local time: there's a highly consistent ~100-120min dead zone
-in the `schedule:` trigger's firing every single day, starting at almost
-exactly 19:56-20:00 America/Toronto (= UTC midnight) and not resuming until
-roughly 21:42-21:56. Same window, four days running — this is UTC-midnight
-congestion on GitHub's shared free-tier cron queue (a huge fraction of
-"daily" jobs across the whole platform fire at `0 0 * * *`), not something
-specific to this repo, and not something the "5-25-45 past the hour" minute
-offsets in `dashboard.yml` can dodge.
+`dashboard.yml`'s `schedule:` trigger no longer fires, at all, ever. This
+isn't a live problem anymore (the Pi trigger replaced it — see
+Architecture above), but the history explains why that solution exists and
+why re-enabling `schedule:` isn't a reasonable thing to try again later.
 
-Effect: the queue usually manages one render right as it recovers
-(~9:45-9:56pm) and then, some days, one more before the active-hours cutoff
-— so the last image the Kindle displays before quiet hours often really is
-from just before 10pm rather than closer to 11pm. This is the same
-"schedule: is best-effort" limitation already known from earlier research,
-just now pinned to a specific cause and time window rather than generic
-flakiness.
+**Phase 1 (2026-08-24): partial, patterned unreliability.** Pulling Actions
+run history across 4 days and converting to local time showed a highly
+consistent ~100-120min dead zone in `schedule:` firing every single day,
+starting almost exactly 19:56-20:00 America/Toronto (= UTC midnight) and
+not resuming until roughly 21:42-21:56. This is UTC-midnight congestion on
+GitHub's shared free-tier cron queue (a huge fraction of "daily" jobs
+platform-wide fire at `0 0 * * *`) — not specific to this repo, and not
+something minute-offset tweaks in the cron expression could dodge.
 
-**Optional future path: bypass the `schedule:` queue entirely.**
-`workflow_dispatch` (manual/API-triggered runs) is not subject to this same
-congestion — it fires immediately regardless of what the cron queue is
-doing. So a small always-on device on the home network, hitting
-`POST /repos/{owner}/{repo}/actions/workflows/{id}/dispatches` on its own
-schedule instead of relying on GitHub's `schedule:` trigger, would sidestep
-this specific problem entirely. Candidates discussed:
+**Phase 2 (2026-08-27): total failure after going public.** Within hours of
+`kindle-dash`'s visibility changing to public, `schedule:` stopped firing
+entirely — zero runs for a full day, confirmed while `workflow_dispatch`
+kept working flawlessly every single time. Attempted the documented
+GitHub-side remediation (edit the cron trigger itself, push, run manually
+to "re-register") — no effect even after several hours, well past the
+"wait 2 hours" checkpoint that fix is supposed to need.
 
-- **Repurpose an old Raspberry Pi 3** the household already owns as the
-  trigger (not the renderer — keep the actual `render.py`/Playwright work
-  on GitHub Actions' Ubuntu runners; a Pi 3's 1GB RAM makes a poor
-  headless-Chromium host). Effectively free (idle power draw only, no
-  recurring cost), and the dispatch token stays on hardware under direct
-  control rather than a third party's. Tradeoffs: this contradicts the
-  "no always-on machine" framing above, so treat that as superseded if this
-  path is taken; needs a systemd service (not just a login cron) so it
-  survives reboots/power blips, and SD cards wear under 24/7 writes (boot
-  off USB storage if available, or keep writes minimal). Scope the
-  dispatch token to `Actions: write` only on this repo — a different,
-  narrower token than the Kindle's `Contents: Read` one.
-- **n8n Cloud** as a hosted alternative — no hardware to maintain, and its
-  credential storage is genuinely encrypted (AES-256 at rest on Cloud,
-  FIPS-140-2), unlike cron-job.org's plaintext storage which ruled that
-  option out earlier. But n8n dropped its free tier; Cloud pricing starts
-  at $24/mo (2,500 executions), which is hard to justify against a Pi
-  that's already sitting in a drawer.
+**Phase 3: GitHub Support closed the ticket as self-service-only.** Free-tier
+personal accounts don't get human investigation of Actions-internals bugs
+like this — routed to Community Discussions instead. Those discussions (a
+handful of multi-month-old, still-unresolved threads with the identical
+symptom: `schedule:` silently stops registering, `workflow_dispatch`
+keeps working) confirm this is a known, long-standing, unfixed class of
+GitHub bug, not something specific to this repo or something likely to
+resolve itself soon.
+
+One lead that went nowhere: a GitHub status incident ("Disruption with
+GitHub Billing," started ~3.5h before the visibility change) overlapped
+suspiciously with the timing, and public-repo unlimited Actions minutes is
+a billing-relevant status change — plausible that a degraded billing
+service caused a failed schedule-registration handshake. Included in the
+Support ticket as a lead; GitHub's own incident updates never mentioned
+Actions across ~17 hours of active investigation, so treat this as
+unconfirmed, not as the explanation.
+
+**Phase 4 (2026-08-27): fixed via the Pi trigger**, not via GitHub. See
+Architecture above. A `/loop`-based bridge (this session manually firing
+`workflow_dispatch` every 20 minutes) covered the gap between the ticket
+closing and the Pi being ready — no longer needed, don't resurrect it
+unless the Pi itself is offline for an extended period.
 
 ## Deferred feature: Ecobee room sensors
 
@@ -259,16 +325,14 @@ Decided to wait for the Raspberry Pi rather than solve it via GitHub-secret
 auto-rewriting (the other option considered: a second fine-grained PAT
 scoped to `Secrets: write`, with a workflow step that persists Ecobee's
 rotated token after every run — works, but is a new moving part that
-silently breaks re-pairing if a run ever fails mid-chain). Once the Pi
-exists for the cron-trigger project, it's the natural place for the Ecobee
-token too — lives on local disk like any normal app credential, and the Pi
-can just push current sensor readings into the repo for `render.py` to
-pick up, no secret-rewriting involved.
+silently breaks re-pairing if a run ever fails mid-chain).
 
-Not started — revisit once the Pi is real.
-
-Not started — revisit if the evening staleness becomes worth solving
-outright rather than living with.
+**The Pi exists now** (see Architecture above), so this is technically
+unblocked — the Ecobee token could live on local disk like any normal app
+credential, with the Pi pushing current sensor readings into the repo for
+`render.py` to pick up, no secret-rewriting involved. Still not started;
+revisit when this feature actually gets prioritized, not automatically
+just because the Pi is available.
 
 ## Style
 
