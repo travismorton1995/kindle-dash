@@ -2,21 +2,12 @@ name: Render dashboard
 
 on:
   schedule:
-    # Every 20 min, 6am-11pm America/Toronto. Starts an hour before the
-    # Kindle's own QUIET_END (7am in kindle/config.sh) on purpose: by the
-    # time the Kindle wakes for its first fetch of the day, there's already
-    # been a render or two, instead of it grabbing the last pre-quiet-hours
-    # image from the night before while Actions catches up.
-    #
-    # cron is UTC-only and doesn't shift for DST, so this window is
-    # deliberately wider than 6am-11pm local: it's the union of the EDT
-    # (UTC-4) and EST (UTC-5) versions of that range, 10:00-03:59 UTC. The
-    # "Check active hours" step below does the real filtering against
-    # actual local time, so the schedule stays correct year-round without
-    # editing the cron for DST.
-    #
-    # GitHub's cron has a 5-minute floor and fires late under load, which
-    # is fine for weather and a calendar.
+    # Vestigial: confirmed dead (see CLAUDE.md, "schedule: is dead") and
+    # kept only as free redundancy in case GitHub ever quietly fixes it.
+    # The real trigger is the Pi (pi/trigger.sh), calling workflow_dispatch
+    # every 20 minutes around the clock -- the "Check active hours" step
+    # below is what actually gates active vs. quiet hours now, for either
+    # trigger source.
     - cron: "3,23,43 10-23,0-3 * * *"
   workflow_dispatch:
 
@@ -33,16 +24,28 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      # The cron trigger fires on a UTC window wide enough to cover both
-      # EDT and EST (see comment above). This step narrows that down to
-      # the real 6am-11pm local target using actual wall-clock time, so
-      # a run outside that window (the ~1hr of slack on each end) is a
-      # no-op instead of an early/late render.
+      # Gates every dispatch, from the Pi or the vestigial cron alike,
+      # against actual local wall-clock time.
+      #
+      # Start is 6:35am, not a round 6:00 or 7:00 -- deliberately tight
+      # against the Kindle's 7am QUIET_END. The Pi fires every 20 minutes
+      # with no fixed clock alignment (systemd OnUnitActiveSec, relative to
+      # whenever it last fired, not synced to :00/:20/:40), so by the
+      # pigeonhole principle a 20-minute-wide window is the *shortest*
+      # window that's still guaranteed to catch at least one Pi dispatch
+      # no matter what phase it's on -- any shorter and a real phase could
+      # miss it entirely. 6:35-7:00 is 25 minutes: the 20-minute guarantee
+      # plus 5 minutes of padding for actual render+publish time, which
+      # isn't instantaneous once a dispatch does land. Moving this earlier
+      # "for safety" just burns extra renders the Kindle will never see,
+      # since it doesn't wake until 7am regardless.
       - name: Check active hours
         id: check
         run: |
-          hour=$(TZ="${{ vars.TIMEZONE || 'America/Toronto' }}" date +%H)
-          if [ "$hour" -ge 6 ] && [ "$hour" -le 22 ]; then
+          h=$(TZ="${{ vars.TIMEZONE || 'America/Toronto' }}" date +%H)
+          m=$(TZ="${{ vars.TIMEZONE || 'America/Toronto' }}" date +%M)
+          total=$((10#$h * 60 + 10#$m))
+          if [ "$total" -ge 395 ] && [ "$total" -le 1379 ]; then
             echo "active=true" >> "$GITHUB_OUTPUT"
           else
             echo "active=false" >> "$GITHUB_OUTPUT"
