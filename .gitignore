@@ -5,6 +5,7 @@ venv/
 dash.png
 _render.html
 kindle/config.sh
+pi/config.sh
 test.ics
 *.ics
 .env

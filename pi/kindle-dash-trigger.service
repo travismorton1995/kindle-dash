@@ -1,0 +1,9 @@
+[Unit]
+Description=Trigger kindle-dash dashboard render via workflow_dispatch
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/travismorton/kindle-dash-trigger/trigger.sh
+User=travismorton

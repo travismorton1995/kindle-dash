@@ -1,0 +1,10 @@
+[Unit]
+Description=Run kindle-dash-trigger every 20 minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=20min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

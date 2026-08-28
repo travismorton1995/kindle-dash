@@ -1,0 +1,10 @@
+# Copy to config.sh (keep chmod 600, never commit) and fill in.
+
+# Fine-grained PAT, scoped to travismorton1995/kindle-dash only,
+# Actions: Read and write. Separate from every other token in this project
+# -- this one can trigger renders, nothing else.
+GITHUB_TOKEN="github_pat_..."
+
+# Branch to dispatch the workflow against. Use "pi-trigger" while testing
+# this setup end to end; switch to "master" once validated and merged.
+REF="pi-trigger"
