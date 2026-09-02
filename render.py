@@ -17,6 +17,8 @@ import datetime as dt
 import json
 import os
 import sys
+import time
+import urllib.error
 import urllib.request
 import zoneinfo
 from pathlib import Path
@@ -212,10 +214,19 @@ def is_night(d, sunrise, sunset):
     return d.time() < sunrise.time() or d.time() >= sunset.time()
 
 
-def fetch_json(url, headers=None, timeout=30):
+def fetch_json(url, headers=None, timeout=30, attempts=3):
+    """Open-Meteo occasionally returns a 200 with an empty body (confirmed
+    twice, ~5h apart, 2026-09-01) - retry rather than fail the whole render
+    over a single blank response."""
     req = urllib.request.Request(url, headers=headers or {})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode())
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.loads(r.read().decode())
+        except (json.JSONDecodeError, urllib.error.URLError, TimeoutError):
+            if attempt == attempts:
+                raise
+            time.sleep(2 * attempt)
 
 
 def get_weather(now):
