@@ -14,6 +14,7 @@ Configuration comes from environment variables:
 """
 
 import datetime as dt
+import http.client
 import json
 import os
 import sys
@@ -214,19 +215,33 @@ def is_night(d, sunrise, sunset):
     return d.time() < sunrise.time() or d.time() >= sunset.time()
 
 
-def fetch_json(url, headers=None, timeout=30, attempts=3):
-    """Open-Meteo occasionally returns a 200 with an empty body (confirmed
-    twice, ~5h apart, 2026-09-01) - retry rather than fail the whole render
-    over a single blank response."""
-    req = urllib.request.Request(url, headers=headers or {})
+# Open-Meteo occasionally returns a 200 with an empty body (confirmed twice,
+# ~5h apart, 2026-09-01). OSError covers URLError/HTTPError, TimeoutError,
+# ConnectionResetError, and ssl.SSLError (all subclasses); IncompleteRead
+# isn't (it's an HTTPException); ValueError covers JSONDecodeError and
+# icalendar's from_ical on malformed/empty bytes. Retry rather than fail the
+# whole render over one transient blip on either fetch.
+RETRYABLE_FETCH_ERRORS = (OSError, http.client.IncompleteRead, ValueError)
+
+
+def retry_fetch(fn, attempts=3):
     for attempt in range(1, attempts + 1):
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return json.loads(r.read().decode())
-        except (json.JSONDecodeError, urllib.error.URLError, TimeoutError):
+            return fn()
+        except RETRYABLE_FETCH_ERRORS:
             if attempt == attempts:
                 raise
             time.sleep(2 * attempt)
+
+
+def fetch_json(url, headers=None, timeout=30, attempts=3):
+    req = urllib.request.Request(url, headers=headers or {})
+
+    def _do():
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode())
+
+    return retry_fetch(_do, attempts)
 
 
 def get_weather(now):
@@ -285,8 +300,12 @@ def get_events(day_start, day_end):
     timed, allday = [], []
     for url in ICS_URLS:
         req = urllib.request.Request(url, headers={"User-Agent": "kindle-dash"})
-        with urllib.request.urlopen(req, timeout=45) as r:
-            cal = Calendar.from_ical(r.read())
+
+        def _do():
+            with urllib.request.urlopen(req, timeout=45) as r:
+                return Calendar.from_ical(r.read())
+
+        cal = retry_fetch(_do)
 
         for e in recurring_ical_events.of(cal).between(day_start, day_end):
             start = e["DTSTART"].dt
