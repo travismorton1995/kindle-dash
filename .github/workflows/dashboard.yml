@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: write
-  actions: write   # for the failure-streak repo variable, see "Render" / "Track render failures" below
 
 concurrency:
   group: dashboard
@@ -157,29 +156,48 @@ jobs:
       # Only actually fail this job -- which is what triggers GitHub's
       # failure-notification email -- once THRESHOLD consecutive renders have
       # failed in a row, and stay quiet for the rest of that same incident.
-      # RENDER_FAIL_STREAK (a repo variable, same mechanism as vars.TIMEZONE
-      # above) tracks the count statelessly across runs; a later success
-      # resets it to 0, so the next incident notifies fresh.
+      #
+      # State lives in a streak.txt file on a dedicated render-fail-streak
+      # branch, same force-push-a-throwaway-branch mechanism as Heartbeat
+      # above (not a repo Variable: tried that first, but the default
+      # GITHUB_TOKEN gets a hard 403 managing repo Variables via the API no
+      # matter what `permissions:` grants -- confirmed 2026-09-03 -- while
+      # contents: write already works, since Heartbeat already proves it).
+      # A later success resets the streak to 0, so the next incident
+      # notifies fresh.
       - name: Track render failures, only alert after a real streak
         if: steps.check.outputs.active == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           THRESHOLD=3
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
 
-          if [ "${{ steps.render.outcome }}" = "success" ]; then
-            gh variable set RENDER_FAIL_STREAK --body 0 --repo "${{ github.repository }}"
-            exit 0
+          mkdir -p /tmp/streak
+          cd /tmp/streak
+          git init -q
+          git config user.name "dashboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+
+          prev=0
+          if git fetch -q "$REPO_URL" render-fail-streak 2>/dev/null; then
+            prev=$(git show FETCH_HEAD:streak.txt 2>/dev/null || echo 0)
           fi
 
-          prev=$(gh variable get RENDER_FAIL_STREAK --repo "${{ github.repository }}" 2>/dev/null || echo 0)
-          streak=$((prev + 1))
-          gh variable set RENDER_FAIL_STREAK --body "$streak" --repo "${{ github.repository }}"
+          if [ "${{ steps.render.outcome }}" = "success" ]; then
+            streak=0
+          else
+            streak=$((prev + 1))
+          fi
+
+          echo "$streak" > streak.txt
+          git checkout -q -b render-fail-streak
+          git add streak.txt
+          git commit -qm "streak=$streak"
+          git push -q --force "$REPO_URL" render-fail-streak
           echo "consecutive render failures: $streak"
 
-          if [ "$streak" -eq "$THRESHOLD" ]; then
+          if [ "${{ steps.render.outcome }}" != "success" ] && [ "$streak" -eq "$THRESHOLD" ]; then
             echo "::error::Render has now failed $THRESHOLD times in a row -- likely a real problem, not a blip."
             exit 1
           fi
-          echo "below threshold, or already alerted earlier in this incident -- not failing the job."
+          echo "below threshold, already alerted this incident, or render succeeded -- not failing the job."
