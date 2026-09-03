@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  actions: write   # for the failure-streak repo variable, see "Render" / "Track render failures" below
 
 concurrency:
   group: dashboard
@@ -90,8 +91,16 @@ jobs:
           pip install -r requirements.txt
           python -m playwright install --with-deps chromium
 
+      # continue-on-error so a failed render doesn't immediately fail the job
+      # (which is what triggers GitHub's email) -- the "Track render
+      # failures" step below decides that instead, based on how many in a
+      # row this makes. steps.render.outcome still reports the *true*
+      # pass/fail here despite continue-on-error (that's what it's for --
+      # only the job's own conclusion gets masked).
       - name: Render
+        id: render
         if: steps.check.outputs.active == 'true'
+        continue-on-error: true
         env:
           ICS_URL: ${{ secrets.ICS_URL }}
           LATITUDE: ${{ secrets.LATITUDE }}
@@ -103,7 +112,7 @@ jobs:
       # rendered image (real calendar event titles, effectively a live
       # schedule) never lands anywhere kindle-dash's own visibility affects.
       - name: Publish to output repo
-        if: steps.check.outputs.active == 'true'
+        if: steps.check.outputs.active == 'true' && steps.render.outcome == 'success'
         run: |
           set -euo pipefail
           mkdir -p /tmp/publish-private
@@ -125,7 +134,7 @@ jobs:
       # still private; needed once it goes public, since the real publish
       # traffic will have moved to kindle-dash-output by then.
       - name: Heartbeat
-        if: steps.check.outputs.active == 'true'
+        if: steps.check.outputs.active == 'true' && steps.render.outcome == 'success'
         run: |
           set -euo pipefail
           mkdir -p /tmp/heartbeat
@@ -140,3 +149,37 @@ jobs:
           git push -q --force \
             "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
             heartbeat
+
+      # A single failed render is almost always Open-Meteo/calendar
+      # flakiness that the next 20-minute cycle recovers from on its own
+      # (retried internally too, see render.py's retry_fetch) -- emailing on
+      # every one of those meant 4-5 emails for one transient blip (2026-09-02).
+      # Only actually fail this job -- which is what triggers GitHub's
+      # failure-notification email -- once THRESHOLD consecutive renders have
+      # failed in a row, and stay quiet for the rest of that same incident.
+      # RENDER_FAIL_STREAK (a repo variable, same mechanism as vars.TIMEZONE
+      # above) tracks the count statelessly across runs; a later success
+      # resets it to 0, so the next incident notifies fresh.
+      - name: Track render failures, only alert after a real streak
+        if: steps.check.outputs.active == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          THRESHOLD=3
+
+          if [ "${{ steps.render.outcome }}" = "success" ]; then
+            gh variable set RENDER_FAIL_STREAK --body 0 --repo "${{ github.repository }}"
+            exit 0
+          fi
+
+          prev=$(gh variable get RENDER_FAIL_STREAK --repo "${{ github.repository }}" 2>/dev/null || echo 0)
+          streak=$((prev + 1))
+          gh variable set RENDER_FAIL_STREAK --body "$streak" --repo "${{ github.repository }}"
+          echo "consecutive render failures: $streak"
+
+          if [ "$streak" -eq "$THRESHOLD" ]; then
+            echo "::error::Render has now failed $THRESHOLD times in a row -- likely a real problem, not a blip."
+            exit 1
+          fi
+          echo "below threshold, or already alerted earlier in this incident -- not failing the job."
