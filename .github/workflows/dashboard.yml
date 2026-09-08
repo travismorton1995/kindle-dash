@@ -132,29 +132,42 @@ jobs:
       # public repos auto-disable scheduled workflows for. Harmless while
       # still private; needed once it goes public, since the real publish
       # traffic will have moved to kindle-dash-output by then.
-      # continue-on-error: the heartbeat push has failed transiently before
-      # (GitHub-side "fatal error in commit_refs" on the force-push, 2026-09-08
-      # -- gone on the very next run with no code change) with no bearing on
-      # whether the actual dashboard render/publish succeeded. Not worth
-      # failing the whole job -- and triggering GitHub's failure email --
-      # over a keepalive timestamp that gets retried in 20 minutes regardless.
+      #
+      # Builds on the existing heartbeat branch instead of git-init'ing a
+      # fresh orphan commit every run: the old version force-pushed a brand
+      # new, unrelated single-commit history every ~20 minutes, which is a
+      # full ref replacement rather than a normal update. That's the likely
+      # cause of the "fatal error in commit_refs" push failures seen
+      # 2026-09-08 -- a GitHub-side hiccup handling that pattern at high
+      # frequency, not anything about our token or permissions. Fetching the
+      # branch first and committing on top makes this an ordinary
+      # fast-forward push, which should be far less likely to trip it.
+      # continue-on-error stays regardless, as a safety net for whatever
+      # flakiness remains -- this step has no bearing on whether the actual
+      # dashboard render/publish succeeded.
       - name: Heartbeat
         if: steps.check.outputs.active == 'true' && steps.render.outcome == 'success'
         continue-on-error: true
         run: |
           set -euo pipefail
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+
           mkdir -p /tmp/heartbeat
-          date -u +%FT%TZ > /tmp/heartbeat/heartbeat.txt
           cd /tmp/heartbeat
           git init -q
-          git checkout -q -b heartbeat
           git config user.name "dashboard-bot"
           git config user.email "actions@users.noreply.github.com"
+
+          if git fetch -q --depth 1 "$REPO_URL" heartbeat 2>/dev/null; then
+            git checkout -q -b heartbeat FETCH_HEAD
+          else
+            git checkout -q -b heartbeat
+          fi
+
+          date -u +%FT%TZ > heartbeat.txt
           git add heartbeat.txt
           git commit -qm "heartbeat $(date -u +%FT%TZ)"
-          git push -q --force \
-            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
-            heartbeat
+          git push -q "$REPO_URL" heartbeat
 
       # A single failed render is almost always Open-Meteo/calendar
       # flakiness that the next 20-minute cycle recovers from on its own
