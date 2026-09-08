@@ -132,8 +132,15 @@ jobs:
       # public repos auto-disable scheduled workflows for. Harmless while
       # still private; needed once it goes public, since the real publish
       # traffic will have moved to kindle-dash-output by then.
+      # continue-on-error: the heartbeat push has failed transiently before
+      # (GitHub-side "fatal error in commit_refs" on the force-push, 2026-09-08
+      # -- gone on the very next run with no code change) with no bearing on
+      # whether the actual dashboard render/publish succeeded. Not worth
+      # failing the whole job -- and triggering GitHub's failure email --
+      # over a keepalive timestamp that gets retried in 20 minutes regardless.
       - name: Heartbeat
         if: steps.check.outputs.active == 'true' && steps.render.outcome == 'success'
+        continue-on-error: true
         run: |
           set -euo pipefail
           mkdir -p /tmp/heartbeat
