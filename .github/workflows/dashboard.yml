@@ -205,12 +205,31 @@ jobs:
       # contents: write already works, since Heartbeat already proves it).
       # A later success resets the streak to 0, so the next incident
       # notifies fresh.
+      #
+      # Same fetch-and-build-on-top-with-periodic-reset shape as Heartbeat,
+      # for the same reason: this branch used to git-init a brand new orphan
+      # commit and force-push over the old one every run too, and hit the
+      # identical GitHub-side "fatal error in commit_refs" push failure
+      # (2026-09-08/09) -- on this step, uncaught, which crashed the whole
+      # script before it ever reached the real alerting check below.
+      # --allow-empty because unlike Heartbeat's timestamp, streak.txt often
+      # doesn't change between runs (e.g. 0 -> 0 while renders keep
+      # succeeding), and a fast-forward commit with no diff from its parent
+      # would otherwise fail outright.
+      #
+      # Crucially, the push itself must never be allowed to abort the
+      # script (hence `|| echo`, not letting set -e do its thing): this
+      # step's real job is the THRESHOLD check below, and a git-push flake
+      # bookkeeping the streak counter is a different failure from "render
+      # actually broke 3 times in a row" and must not be conflated with it
+      # or silently swallow that real alert.
       - name: Track render failures, only alert after a real streak
         if: steps.check.outputs.active == 'true'
         run: |
           set -euo pipefail
           THRESHOLD=3
           REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          RESET_AFTER=500
 
           mkdir -p /tmp/streak
           cd /tmp/streak
@@ -219,8 +238,17 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
 
           prev=0
-          if git fetch -q "$REPO_URL" render-fail-streak 2>/dev/null; then
+          reset=true
+          if git fetch -q --depth "$RESET_AFTER" "$REPO_URL" render-fail-streak 2>/dev/null; then
             prev=$(git show FETCH_HEAD:streak.txt 2>/dev/null || echo 0)
+            count=$(git rev-list --count FETCH_HEAD)
+            if [ "$count" -lt "$RESET_AFTER" ]; then
+              git checkout -q -b render-fail-streak FETCH_HEAD
+              reset=false
+            fi
+          fi
+          if [ "$reset" = true ]; then
+            git checkout -q --orphan render-fail-streak
           fi
 
           if [ "${{ steps.render.outcome }}" = "success" ]; then
@@ -230,10 +258,13 @@ jobs:
           fi
 
           echo "$streak" > streak.txt
-          git checkout -q -b render-fail-streak
           git add streak.txt
-          git commit -qm "streak=$streak"
-          git push -q --force "$REPO_URL" render-fail-streak
+          git commit -q --allow-empty -m "streak=$streak"
+          if [ "$reset" = true ]; then
+            git push -q --force "$REPO_URL" render-fail-streak || echo "::warning::render-fail-streak push failed -- continuing, doesn't affect this run's alerting"
+          else
+            git push -q "$REPO_URL" render-fail-streak || echo "::warning::render-fail-streak push failed -- continuing, doesn't affect this run's alerting"
+          fi
           echo "consecutive render failures: $streak"
 
           if [ "${{ steps.render.outcome }}" != "success" ] && [ "$streak" -eq "$THRESHOLD" ]; then
