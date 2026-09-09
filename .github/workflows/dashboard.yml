@@ -142,6 +142,15 @@ jobs:
       # frequency, not anything about our token or permissions. Fetching the
       # branch first and committing on top makes this an ordinary
       # fast-forward push, which should be far less likely to trip it.
+      #
+      # That history has to stop growing somewhere, though, or the branch
+      # accumulates one tiny commit per run forever. RESET_AFTER caps it:
+      # once the branch reaches that many commits, this run squashes back
+      # down to a single orphan commit (the old force-push behavior) instead
+      # of extending it further. At ~50 active-hours runs/day, 500 is
+      # roughly a 10-day cycle -- frequent resets to keep the ref-replacement
+      # pattern rare, without going back to doing it on literally every run.
+      #
       # continue-on-error stays regardless, as a safety net for whatever
       # flakiness remains -- this step has no bearing on whether the actual
       # dashboard render/publish succeeded.
@@ -151,6 +160,7 @@ jobs:
         run: |
           set -euo pipefail
           REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          RESET_AFTER=500
 
           mkdir -p /tmp/heartbeat
           cd /tmp/heartbeat
@@ -158,16 +168,26 @@ jobs:
           git config user.name "dashboard-bot"
           git config user.email "actions@users.noreply.github.com"
 
-          if git fetch -q --depth 1 "$REPO_URL" heartbeat 2>/dev/null; then
-            git checkout -q -b heartbeat FETCH_HEAD
-          else
-            git checkout -q -b heartbeat
+          reset=true
+          if git fetch -q --depth "$RESET_AFTER" "$REPO_URL" heartbeat 2>/dev/null; then
+            count=$(git rev-list --count FETCH_HEAD)
+            if [ "$count" -lt "$RESET_AFTER" ]; then
+              git checkout -q -b heartbeat FETCH_HEAD
+              reset=false
+            fi
+          fi
+          if [ "$reset" = true ]; then
+            git checkout -q --orphan heartbeat
           fi
 
           date -u +%FT%TZ > heartbeat.txt
           git add heartbeat.txt
           git commit -qm "heartbeat $(date -u +%FT%TZ)"
-          git push -q "$REPO_URL" heartbeat
+          if [ "$reset" = true ]; then
+            git push -q --force "$REPO_URL" heartbeat
+          else
+            git push -q "$REPO_URL" heartbeat
+          fi
 
       # A single failed render is almost always Open-Meteo/calendar
       # flakiness that the next 20-minute cycle recovers from on its own
