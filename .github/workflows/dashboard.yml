@@ -84,11 +84,27 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}
 
+      # Retries --with-deps specifically: that's the part that shells out to
+      # apt-get against Google's own Chrome repo, which occasionally serves
+      # an apt Hash Sum mismatch -- its InRelease index and Packages.gz
+      # fetched a moment apart while the upstream repo was mid-update, not
+      # anything wrong on our end (confirmed 2026-09-09, two runs 15 minutes
+      # apart, both while this file was unchanged). That mirror desync
+      # clears within seconds, so a short-delay retry is the actual fix,
+      # not a workaround for something in this repo.
       - name: Install dependencies
         if: steps.check.outputs.active == 'true'
         run: |
           pip install -r requirements.txt
-          python -m playwright install --with-deps chromium
+          for attempt in 1 2 3; do
+            python -m playwright install --with-deps chromium && break
+            if [ "$attempt" = 3 ]; then
+              echo "::error::playwright install --with-deps failed 3 times in a row."
+              exit 1
+            fi
+            echo "playwright install --with-deps failed (attempt $attempt/3) -- retrying in 15s"
+            sleep 15
+          done
 
       # continue-on-error so a failed render doesn't immediately fail the job
       # (which is what triggers GitHub's email) -- the "Track render
