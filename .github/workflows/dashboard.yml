@@ -84,11 +84,27 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}
 
+      # Retries --with-deps specifically: that's the part that shells out to
+      # apt-get against Google's own Chrome repo, which occasionally serves
+      # an apt Hash Sum mismatch -- its InRelease index and Packages.gz
+      # fetched a moment apart while the upstream repo was mid-update, not
+      # anything wrong on our end (confirmed 2026-09-09, two runs 15 minutes
+      # apart, both while this file was unchanged). That mirror desync
+      # clears within seconds, so a short-delay retry is the actual fix,
+      # not a workaround for something in this repo.
       - name: Install dependencies
         if: steps.check.outputs.active == 'true'
         run: |
           pip install -r requirements.txt
-          python -m playwright install --with-deps chromium
+          for attempt in 1 2 3; do
+            python -m playwright install --with-deps chromium && break
+            if [ "$attempt" = 3 ]; then
+              echo "::error::playwright install --with-deps failed 3 times in a row."
+              exit 1
+            fi
+            echo "playwright install --with-deps failed (attempt $attempt/3) -- retrying in 15s"
+            sleep 15
+          done
 
       # continue-on-error so a failed render doesn't immediately fail the job
       # (which is what triggers GitHub's email) -- the "Track render
@@ -132,22 +148,62 @@ jobs:
       # public repos auto-disable scheduled workflows for. Harmless while
       # still private; needed once it goes public, since the real publish
       # traffic will have moved to kindle-dash-output by then.
+      #
+      # Builds on the existing heartbeat branch instead of git-init'ing a
+      # fresh orphan commit every run: the old version force-pushed a brand
+      # new, unrelated single-commit history every ~20 minutes, which is a
+      # full ref replacement rather than a normal update. That's the likely
+      # cause of the "fatal error in commit_refs" push failures seen
+      # 2026-09-08 -- a GitHub-side hiccup handling that pattern at high
+      # frequency, not anything about our token or permissions. Fetching the
+      # branch first and committing on top makes this an ordinary
+      # fast-forward push, which should be far less likely to trip it.
+      #
+      # That history has to stop growing somewhere, though, or the branch
+      # accumulates one tiny commit per run forever. RESET_AFTER caps it:
+      # once the branch reaches that many commits, this run squashes back
+      # down to a single orphan commit (the old force-push behavior) instead
+      # of extending it further. At ~50 active-hours runs/day, 500 is
+      # roughly a 10-day cycle -- frequent resets to keep the ref-replacement
+      # pattern rare, without going back to doing it on literally every run.
+      #
+      # continue-on-error stays regardless, as a safety net for whatever
+      # flakiness remains -- this step has no bearing on whether the actual
+      # dashboard render/publish succeeded.
       - name: Heartbeat
         if: steps.check.outputs.active == 'true' && steps.render.outcome == 'success'
+        continue-on-error: true
         run: |
           set -euo pipefail
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          RESET_AFTER=500
+
           mkdir -p /tmp/heartbeat
-          date -u +%FT%TZ > /tmp/heartbeat/heartbeat.txt
           cd /tmp/heartbeat
           git init -q
-          git checkout -q -b heartbeat
           git config user.name "dashboard-bot"
           git config user.email "actions@users.noreply.github.com"
+
+          reset=true
+          if git fetch -q --depth "$RESET_AFTER" "$REPO_URL" heartbeat 2>/dev/null; then
+            count=$(git rev-list --count FETCH_HEAD)
+            if [ "$count" -lt "$RESET_AFTER" ]; then
+              git checkout -q -b heartbeat FETCH_HEAD
+              reset=false
+            fi
+          fi
+          if [ "$reset" = true ]; then
+            git checkout -q --orphan heartbeat
+          fi
+
+          date -u +%FT%TZ > heartbeat.txt
           git add heartbeat.txt
           git commit -qm "heartbeat $(date -u +%FT%TZ)"
-          git push -q --force \
-            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
-            heartbeat
+          if [ "$reset" = true ]; then
+            git push -q --force "$REPO_URL" heartbeat
+          else
+            git push -q "$REPO_URL" heartbeat
+          fi
 
       # A single failed render is almost always Open-Meteo/calendar
       # flakiness that the next 20-minute cycle recovers from on its own
@@ -165,12 +221,31 @@ jobs:
       # contents: write already works, since Heartbeat already proves it).
       # A later success resets the streak to 0, so the next incident
       # notifies fresh.
+      #
+      # Same fetch-and-build-on-top-with-periodic-reset shape as Heartbeat,
+      # for the same reason: this branch used to git-init a brand new orphan
+      # commit and force-push over the old one every run too, and hit the
+      # identical GitHub-side "fatal error in commit_refs" push failure
+      # (2026-09-08/09) -- on this step, uncaught, which crashed the whole
+      # script before it ever reached the real alerting check below.
+      # --allow-empty because unlike Heartbeat's timestamp, streak.txt often
+      # doesn't change between runs (e.g. 0 -> 0 while renders keep
+      # succeeding), and a fast-forward commit with no diff from its parent
+      # would otherwise fail outright.
+      #
+      # Crucially, the push itself must never be allowed to abort the
+      # script (hence `|| echo`, not letting set -e do its thing): this
+      # step's real job is the THRESHOLD check below, and a git-push flake
+      # bookkeeping the streak counter is a different failure from "render
+      # actually broke 3 times in a row" and must not be conflated with it
+      # or silently swallow that real alert.
       - name: Track render failures, only alert after a real streak
         if: steps.check.outputs.active == 'true'
         run: |
           set -euo pipefail
           THRESHOLD=3
           REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          RESET_AFTER=500
 
           mkdir -p /tmp/streak
           cd /tmp/streak
@@ -179,8 +254,17 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
 
           prev=0
-          if git fetch -q "$REPO_URL" render-fail-streak 2>/dev/null; then
+          reset=true
+          if git fetch -q --depth "$RESET_AFTER" "$REPO_URL" render-fail-streak 2>/dev/null; then
             prev=$(git show FETCH_HEAD:streak.txt 2>/dev/null || echo 0)
+            count=$(git rev-list --count FETCH_HEAD)
+            if [ "$count" -lt "$RESET_AFTER" ]; then
+              git checkout -q -b render-fail-streak FETCH_HEAD
+              reset=false
+            fi
+          fi
+          if [ "$reset" = true ]; then
+            git checkout -q --orphan render-fail-streak
           fi
 
           if [ "${{ steps.render.outcome }}" = "success" ]; then
@@ -190,10 +274,13 @@ jobs:
           fi
 
           echo "$streak" > streak.txt
-          git checkout -q -b render-fail-streak
           git add streak.txt
-          git commit -qm "streak=$streak"
-          git push -q --force "$REPO_URL" render-fail-streak
+          git commit -q --allow-empty -m "streak=$streak"
+          if [ "$reset" = true ]; then
+            git push -q --force "$REPO_URL" render-fail-streak || echo "::warning::render-fail-streak push failed -- continuing, doesn't affect this run's alerting"
+          else
+            git push -q "$REPO_URL" render-fail-streak || echo "::warning::render-fail-streak push failed -- continuing, doesn't affect this run's alerting"
+          fi
           echo "consecutive render failures: $streak"
 
           if [ "${{ steps.render.outcome }}" != "success" ] && [ "$streak" -eq "$THRESHOLD" ]; then
