@@ -19,8 +19,8 @@ world-readable instead.
 
 A small Raspberry Pi 3 on the home network (see "The Pi trigger" below)
 triggers renders via `workflow_dispatch`, standing in for GitHub's own
-`schedule:` trigger — which stopped firing entirely and isn't coming back
-on its own. This is the one exception to "no always-on machine": it's
+`schedule:` trigger — which stopped firing entirely, and has since come
+back only as a 4-6 runs/day trickle. This is the one exception to "no always-on machine": it's
 narrowly scoped to triggering, not rendering (that's still GitHub Actions),
 and it exists because the alternative genuinely doesn't work — see below
 before assuming it's a design choice that could just be reverted.
@@ -65,7 +65,7 @@ grow by one PNG every 20 minutes forever. Don't "fix" it into a normal
 commit history.
 
 `dashboard.yml` still declares a `schedule:` trigger, even though it's
-confirmed dead (see "The Pi trigger" below) — left in deliberately as free
+unreliable to the point of uselessness (see "schedule: is dead" below) — left in deliberately as free
 redundancy in case GitHub ever quietly fixes it, not an oversight. Don't
 remove it, and don't rely on it either.
 
@@ -250,6 +250,40 @@ Verified 2026-08-24 (unattended, on battery, ~3 days):
   already exited and needs restarting by hand, same as the on-screen
   message says.
 
+Verified 2026-10-09:
+
+- **The Kindle's own time zone is fixed UTC-5 with no DST.** Symptom: the
+  first refresh of the day landed ~8am instead of ~7am. GitHub's side was
+  ruled out from run history — the "Check active hours" gate flipped from
+  skipped to rendering between 6:16-6:32 and 6:36-6:53 Toronto time every
+  morning 10-03..10-09, so `vars.TIMEZONE` is effectively America/Toronto
+  and a fresh image was ready by ~6:55 daily. On the device, every wifid
+  crash report's filename (device local time) was exactly 5.00h behind its
+  FAT mtime (UTC) across all 14 reports 08-23..10-08, all during EDT
+  (UTC-4). So `dash.sh`'s `date +%-H` read an hour slow, and `QUIET_END=7`
+  meant 8am real time. This was true since setup, not a regression —
+  `dash.log` times (including the 2026-08-28 entries under "Known
+  unknowns") are device clock, i.e. an hour behind real EDT before this fix.
+- **Fix: `export TZ="EST5EDT,M3.2.0,M11.1.0"` in `kindle/config.sh`.**
+  `dash.sh` never set `TZ`, so it inherited whatever its launcher had. Full
+  POSIX rule (not `America/Toronto`) so it doesn't depend on zoneinfo
+  being present on the Kindle; `export` so child `date` calls see it.
+  Added to the on-device config.sh by hand and to `config.sh.example`. Not
+  yet confirmed in `dash.log` — check that the first non-quiet wake lands
+  7:00-7:20 real time.
+- **`dash.sh` actually lives in `/mnt/us/documents/`** on this device,
+  alongside `config.sh` — not `/mnt/us/extensions/dash/` as the header
+  comment and README suggest.
+- **wifid crashes every few days and leaves dumps on the drive.** 14 since
+  08-23, increasing to every 2-3 days from mid-September: a `.core` at
+  `/mnt/us` root (the first three ~62MB each, later ones 0 bytes) plus a
+  `_crash_*.txt` in `documents/`. Each lines up within ~20s with a `wifi
+  did not connect` in `dash.log`, costing one refresh; the next cycle
+  recovers. Plausibly provoked by `dash.sh` toggling wifi ~48x/day,
+  unconfirmed — the reports weren't read (memory dumps may contain the
+  wifi password). Dumps cleared 2026-10-09; watch whether new ones
+  accumulate faster.
+
 ## Known unknowns
 
 Still open:
@@ -291,7 +325,8 @@ so it's safe to leave running unattended for weeks without filling storage.
 
 ## schedule: is dead — history, for context
 
-`dashboard.yml`'s `schedule:` trigger no longer fires, at all, ever. This
+`dashboard.yml`'s `schedule:` trigger stopped firing entirely for a while,
+and has since come back only as a trickle (see Phase 5). This
 isn't a live problem anymore (the Pi trigger replaced it — see
 Architecture above), but the history explains why that solution exists and
 why re-enabling `schedule:` isn't a reasonable thing to try again later.
@@ -336,6 +371,16 @@ Architecture above. A `/loop`-based bridge (this session manually firing
 `workflow_dispatch` every 20 minutes) covered the gap between the ticket
 closing and the Pi being ready — no longer needed, don't resurrect it
 unless the Pi itself is offline for an extended period.
+
+**Phase 5 (checked 2026-10-09): back, but only a trickle.** Run history
+shows `schedule:`-triggered runs resuming around 2026-08-28/29 — roughly a
+day after the Pi took over — and continuing since at **4-6 runs/day**,
+against the 54/day the cron expression asks for. Times are scattered
+(e.g. 10-08: 05:10, 13:20, 18:15, 22:18 Toronto), several hours apart, not
+tracking the `:03/:23/:43` slots. So it's genuinely firing again, but
+nowhere near usable as the primary trigger. Nothing to do: it's still the
+harmless redundancy described in Architecture, and outside-hours ones
+no-op at the "Check active hours" gate like any other dispatch.
 
 ## Deferred feature: Ecobee room sensors
 

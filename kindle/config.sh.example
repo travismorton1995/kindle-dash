@@ -12,3 +12,10 @@ REFRESH_SECONDS=1200
 # Skip refreshes between these hours (24h clock).
 QUIET_START=23
 QUIET_END=7
+
+# Local time zone for the quiet-hours check (and dash.log timestamps).
+# Don't rely on the Kindle's own zone setting: on this unit it's a fixed
+# UTC-5 with no DST, which made every refresh an hour late in summer.
+# Use a full POSIX rule (not "America/Toronto") so it doesn't depend on the
+# Kindle having zoneinfo, and export it so `date` actually sees it.
+export TZ="EST5EDT,M3.2.0,M11.1.0"

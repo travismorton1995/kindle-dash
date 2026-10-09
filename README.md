@@ -98,6 +98,11 @@ chmod +x /mnt/us/extensions/dash/dash.sh
 Run it once by hand from SSH before wiring it to KUAL or boot, so you can watch
 `/mnt/us/dash.log`.
 
+Set `TZ` in `config.sh` (the example has an `export TZ=...` line) rather
+than trusting the Kindle's own time zone — quiet hours are checked against
+the device's local clock, so a wrong zone shifts every refresh. See "Things
+to verify" below.
+
 ### 5. The Pi trigger
 
 Not optional in practice, even though GitHub's `schedule:` trigger looks
@@ -167,6 +172,18 @@ them by trying:
   error, install a current bundle and point curl at it — don't reach for `-k`,
   since the request carries your token. (Confirmed working, no changes
   needed, on a real PW4.)
+- **The Kindle's time zone.** `QUIET_START`/`QUIET_END` are compared
+  against the device's local `date`, and the Kindle's own zone may not
+  observe DST. A real PW4 turned out to be on fixed UTC-5, so during
+  summer time every refresh ran an hour late (first image ~8am instead of
+  ~7am). `config.sh` now exports an explicit POSIX rule —
+  `export TZ="EST5EDT,M3.2.0,M11.1.0"` for Eastern; adjust for yours. Use
+  the full POSIX form rather than a name like `America/Toronto`, which
+  depends on the Kindle having zoneinfo, and keep the `export` or `date`
+  won't see it. A quick check: wifid crash reports
+  (`documents/wifid_*_crash_<time>.txt`) have the device's local time in
+  the filename and a UTC modification time, so the difference shows the
+  offset the Kindle is really using.
 - **Wifi reconnect time.** The 30-second loop in `wifi_up` is generous
   headroom, not a tight guess — a full wake-to-refreshed cycle (wifi up,
   fetch, draw) measured 14-20s end to end on a real PW4. Note: testing over
