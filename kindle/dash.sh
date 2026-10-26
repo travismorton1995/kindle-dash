@@ -10,7 +10,8 @@
 set -u
 
 DIR="$(dirname "$0")"
-. "$DIR/config.sh"   # GITHUB_REPO, GITHUB_TOKEN, REFRESH_SECONDS, QUIET_START, QUIET_END
+. "$DIR/config.sh"   # GITHUB_REPO, GITHUB_TOKEN, REFRESH_SECONDS, REFRESH_SECONDS_LOW,
+                      # QUIET_START, QUIET_END
 
 IMG=/tmp/dash.png
 LOG=/mnt/us/dash.log
@@ -112,6 +113,34 @@ sleep_until_next() {
   fi
 }
 
+# True (0) during the three windows that get the full REFRESH_SECONDS
+# cadence: wake-to-9am every day, plus weekday lunch and after-work. Outside
+# these (still within active hours -- quiet hours are handled separately in
+# the main loop) the reduced REFRESH_SECONDS_LOW cadence applies instead.
+#
+# dow is `date +%w` (0=Sun..6=Sat), not `%u` -- %w is the older, more
+# universally-supported strftime specifier and this device's date applet
+# has already surprised us once (see the TZ/DST finding above).
+is_high_freq_window() {
+  h="$1"
+  dow="$2"
+
+  if [ "$h" -ge 7 ] && [ "$h" -lt 9 ]; then
+    return 0
+  fi
+
+  if [ "$dow" -ge 1 ] && [ "$dow" -le 5 ]; then
+    if [ "$h" -ge 12 ] && [ "$h" -lt 14 ]; then
+      return 0
+    fi
+    if [ "$h" -ge 17 ] && [ "$h" -lt 19 ]; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
 # ---- setup ----------------------------------------------------------------
 
 log "starting (rtc=${WAKEALARM:-none})"
@@ -125,6 +154,7 @@ lipc-set-prop com.lab126.powerd flIntensity 0    # frontlight off; big battery w
 while true; do
   trim_log
   hour=$(date +%-H)
+  dow=$(date +%w)
   bat=$(battery)
 
   if [ "$bat" -lt 8 ]; then
@@ -143,6 +173,10 @@ while true; do
 
   if [ "$hour" -ge "$QUIET_START" ] || [ "$hour" -lt "$QUIET_END" ]; then
     # Overnight: skip the fetch entirely, just sleep to the next check.
+    # Deliberately polls at the full REFRESH_SECONDS cadence, not the
+    # reduced one -- this is what keeps the first wake after QUIET_END
+    # landing promptly (confirmed 7:00-7:20 real time after the TZ fix
+    # above) rather than drifting up to a reduced interval late.
     log "quiet hours, skipping refresh (batt ${bat}%)"
     sleep_until_next "$REFRESH_SECONDS"
     continue
@@ -158,5 +192,9 @@ while true; do
   fi
   wifi_down
 
-  sleep_until_next "$REFRESH_SECONDS"
+  if is_high_freq_window "$hour" "$dow"; then
+    sleep_until_next "$REFRESH_SECONDS"
+  else
+    sleep_until_next "$REFRESH_SECONDS_LOW"
+  fi
 done

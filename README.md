@@ -2,8 +2,10 @@
 
 Weather and calendar dashboard for a jailbroken Kindle Paperwhite 4 (1072×1448).
 A small Raspberry Pi on the home network fires a GitHub Actions render every
-20 minutes; the Kindle wakes on its own RTC alarm every 20 minutes, fetches
-whatever's newest, draws it, and suspends. A power-button press while asleep
+20 minutes; the Kindle wakes on its own RTC alarm — every 20 minutes during
+busy windows, less often otherwise to save battery, see "Refresh schedule"
+below — fetches whatever's newest, draws it, and suspends. A power-button
+press while asleep
 also works as a manual refresh — nothing special about it, it's just another
 wake source into the same loop.
 
@@ -20,7 +22,7 @@ different story (real calendar event titles, effectively a live schedule), so
 it publishes to a second, private repo instead: **kindle-dash-output**.
 
 ```
-Pi (every 20 min)                     Kindle (every 20 min)
+Pi (every 20 min)                     Kindle (20-40 min, varies)
   workflow_dispatch ──┐                 wake on RTC alarm
                        │                 wifi on
                        ▼                 curl the PNG from
@@ -102,6 +104,15 @@ Set `TZ` in `config.sh` (the example has an `export TZ=...` line) rather
 than trusting the Kindle's own time zone — quiet hours are checked against
 the device's local clock, so a wrong zone shifts every refresh. See "Things
 to verify" below.
+
+**Refresh schedule.** `REFRESH_SECONDS` (default 20 min) only applies
+during three "busy" windows — wake-to-9am every day, plus weekday lunch
+(12-2pm) and after-work (5-7pm) — defined in `is_high_freq_window()` in
+`dash.sh`. The rest of active hours uses the slower `REFRESH_SECONDS_LOW`
+(default 40 min) to save battery; quiet hours (`QUIET_START`/`QUIET_END`)
+are unaffected either way. Adjust the window boundaries directly in
+`dash.sh` if your schedule differs — they're not exposed as config
+variables since they're schedule logic, not secrets.
 
 ### 5. The Pi trigger
 
@@ -199,9 +210,11 @@ them by trying:
   (it prints for every `eips` display call regardless of mode, apparently
   harmless chatter on this hardware) but nothing renders on the actual
   screen — treat it as log noise, not a symptom.
-- **Battery life.** ~16 days per charge measured at a 30-minute refresh
-  interval, unattended and on battery; ~11 days projected at the current
-  20-minute default. Below 8%, `dash.sh` draws a low-battery warning and
+- **Battery life.** ~16 days per charge measured at a 30-minute flat refresh
+  interval, unattended and on battery; ~11 days projected at a flat
+  20-minute cadence. The current variable schedule (see "Refresh schedule"
+  above) projects back to roughly 16 days again — not yet confirmed by an
+  actual multi-day measurement. Below 8%, `dash.sh` draws a low-battery warning and
   suspends indefinitely (no RTC alarm armed) rather than idling awake —
   only a physical wake (power button, USB) brings it back, and the script
   needs restarting by hand at that point.

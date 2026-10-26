@@ -8,9 +8,12 @@ A weather and calendar dashboard for a **jailbroken Kindle Paperwhite 4 (10th ge
 GitHub Actions renders a PNG every 20 minutes (during the Kindle's active
 hours only — see `dashboard.yml`'s "Check active hours" step) and pushes it
 to a separate private repo, `kindle-dash-output`. The Kindle wakes on an RTC
-alarm every 20 minutes and fetches whatever's newest from there — the two
-cadences don't need to match, the Kindle just always grabs the latest
-available render. It draws the PNG with `eips` and suspends to RAM.
+alarm and fetches whatever's newest from there — the two cadences don't
+need to match, the Kindle just always grabs the latest available render.
+It draws the PNG with `eips` and suspends to RAM. The Kindle's own wake
+interval isn't flat 20 minutes anymore — see `is_high_freq_window()` in
+`dash.sh` and the 2026-10-26 entry below — but GitHub's render cadence is
+unaffected either way, since the Kindle just grabs whatever's latest.
 
 `kindle-dash` (this repo, the code) is public — unlimited GitHub Actions
 minutes. The rendered image is a different story (real calendar event
@@ -283,6 +286,31 @@ Verified 2026-10-09:
   unconfirmed — the reports weren't read (memory dumps may contain the
   wifi password). Dumps cleared 2026-10-09; watch whether new ones
   accumulate faster.
+
+**Decided (2026-10-26): variable refresh cadence to extend battery life.**
+Flat `REFRESH_SECONDS=1200` (20 min) during all active hours became three
+"busy" windows at the full 20-min cadence — wake-to-9am every day, plus
+weekday lunch (12-2pm) and after-work (5-7pm) — with a new, slower
+`REFRESH_SECONDS_LOW=2400` (40 min) everywhere else in active hours.
+Weekends only keep the wake-to-9am window at full cadence; the rest of the
+weekend runs at the reduced rate. Quiet-hours polling (the sleep between
+checks of whether `QUIET_END` has passed) deliberately still uses the full
+`REFRESH_SECONDS`, not the reduced one, to keep the first wake of the day
+landing promptly rather than drifting late by up to the reduced interval —
+same timing concern the 2026-10-09 TZ fix above was about. Logic lives in
+`is_high_freq_window()` in `dash.sh`, keyed off `date +%w` (0=Sun..6=Sat),
+deliberately not `%u` given the TZ/DST surprise above.
+
+Projected effect, using the same fetch-cycle-proportional approximation as
+the 2026-08-24/25 battery notes above (ballpark, not exact — li-ion
+discharge isn't linear and this hasn't been measured on-device yet): the
+16-day/32-cycles-per-day baseline implies roughly a 512-cycle budget from
+full charge to the 8% cutoff. The new weekday/weekend mix averages ~31.3
+cycles/day across a week (down from 48 flat), projecting to roughly
+**16 days/charge** — back near the original 30-min-flat baseline, while
+keeping true 20-min freshness during the three windows that matter. Not
+yet confirmed by an actual multi-day battery drain test — do that before
+trusting the projection the way the 2026-08-24 measurement was trusted.
 
 ## Known unknowns
 

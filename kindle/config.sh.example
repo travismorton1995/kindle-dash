@@ -9,6 +9,12 @@ GITHUB_TOKEN="github_pat_..."
 
 REFRESH_SECONDS=1200
 
+# Reduced cadence used outside the high-traffic windows (see
+# is_high_freq_window() in dash.sh: mornings until 9am every day, plus
+# weekday lunch and after-work) to save battery the rest of the day.
+# REFRESH_SECONDS above is the "busy" cadence; this is the "otherwise" one.
+REFRESH_SECONDS_LOW=2400
+
 # Skip refreshes between these hours (24h clock).
 QUIET_START=23
 QUIET_END=7
