@@ -62,6 +62,19 @@ Data sources:
   `recurring_ical_events`. Deliberately not Google OAuth — no token refresh,
   no consent screen, no client secret.
 
+**Weather falls back to the last good response (2026-11-18).** Open-Meteo has
+had hours-long bursts of TLS handshake timeouts (2026-11-12/13, 11-18) that
+outlast `retry_fetch`, and each one used to fail the whole render, calendar
+included. Now every successful fetch saves the raw response as
+`weather-cache.json`, and the workflow publishes it to `kindle-dash-output`
+as `weather.json` and restores it before the next render. If Open-Meteo is
+unreachable, `render.py` uses the cache if it's under 12h old and covers the
+current hour, today and tomorrow (hence `forecast_days=3`). "Current"
+conditions then come from that hour's cached forecast, not the stale
+`current` block. Past 12h it raises the original error, so a long outage
+still trips the render-fail-streak alert. The cache lives in the private
+output repo, never here: Open-Meteo echoes the location back in the response.
+
 `dash.png` is force-pushed as a fresh single commit to `kindle-dash-output`'s
 `main` branch every run. This is intentional: without it that repo would
 grow by one PNG every 20 minutes forever. Don't "fix" it into a normal

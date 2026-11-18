@@ -106,6 +106,23 @@ jobs:
             sleep 15
           done
 
+      # The last good Open-Meteo response, published next to dash.png by the
+      # previous successful run. render.py falls back to it when Open-Meteo
+      # is unreachable. Kept in the private output repo, not here, because
+      # the response echoes back the location. A miss (first run, or a fetch
+      # hiccup) just means no fallback this run, not a failure.
+      - name: Restore cached weather
+        if: steps.check.outputs.active == 'true'
+        env:
+          OUTPUT_REPO_TOKEN: ${{ secrets.OUTPUT_REPO_TOKEN }}
+        run: |
+          curl -sfL --max-time 20 \
+            -H "Authorization: Bearer $OUTPUT_REPO_TOKEN" \
+            -H "Accept: application/vnd.github.raw" \
+            -o weather-cache.json \
+            "https://api.github.com/repos/travismorton1995/kindle-dash-output/contents/weather.json?ref=main" \
+            || { rm -f weather-cache.json; echo "no cached weather available this run"; }
+
       # continue-on-error so a failed render doesn't immediately fail the job
       # (which is what triggers GitHub's email) -- the "Track render
       # failures" step below decides that instead, based on how many in a
@@ -133,12 +150,16 @@ jobs:
           mkdir -p /tmp/publish-private
           cp dash.png /tmp/publish-private/
           cp output-repo-readme.md /tmp/publish-private/README.md
+          # Always present after a successful render: freshly written, or the
+          # restored copy the render fell back to (its fetched_at unchanged,
+          # so the 12h staleness cap still holds across fallback runs).
+          cp weather-cache.json /tmp/publish-private/weather.json
           cd /tmp/publish-private
           git init -q
           git checkout -q -b main
           git config user.name "dashboard-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add dash.png README.md
+          git add dash.png README.md weather.json
           git commit -qm "dashboard $(date -u +%FT%TZ)"
           git push -q --force \
             "https://x-access-token:${{ secrets.OUTPUT_REPO_TOKEN }}@github.com/travismorton1995/kindle-dash-output.git" \

@@ -44,6 +44,16 @@ ICS_URLS = [u.strip() for u in os.environ.get("ICS_URL", "").split(",") if u.str
 
 HERE = Path(__file__).parent
 
+# Last good Open-Meteo response, kept between runs: the workflow restores it
+# from, and publishes it back to, the private output repo (the response echoes
+# the location, so it never goes anywhere public). Open-Meteo has had
+# hours-long bursts of TLS handshake timeouts (2026-11-12/13, 11-18) that
+# outlast retry_fetch; without this, each one blanked the calendar half of the
+# dashboard too. 12h covers the overnight gap between the last evening render
+# and the first morning one.
+WEATHER_CACHE = Path(os.environ.get("WEATHER_CACHE", HERE / "weather-cache.json"))
+WEATHER_CACHE_MAX_AGE = dt.timedelta(hours=12)
+
 # WMO weather codes -> short human labels.
 WMO = {
     0: "Clear", 1: "Mostly clear", 2: "Partly cloudy", 3: "Overcast",
@@ -244,22 +254,72 @@ def fetch_json(url, headers=None, timeout=30, attempts=3):
     return retry_fetch(_do, attempts)
 
 
-def get_weather(now):
+CURRENT_FIELDS = ("temperature_2m", "apparent_temperature", "weather_code")
+
+
+def _hour_key(now):
+    return now.strftime("%Y-%m-%dT%H:00")
+
+
+def load_cached_weather(now):
+    """The cached response, or None if it's missing, too old, or doesn't
+    cover the current hour plus today and tomorrow."""
+    try:
+        d = json.loads(WEATHER_CACHE.read_text())
+        age = now - dt.datetime.fromisoformat(d["fetched_at"])
+        days = d["daily"]["time"]
+        today = now.date().isoformat()
+        covered = (
+            today in days
+            and days.index(today) + 1 < len(days)
+            and _hour_key(now) in d["hourly"]["time"]
+        )
+    except (OSError, ValueError, KeyError):
+        return None
+    return d if covered and age <= WEATHER_CACHE_MAX_AGE else None
+
+
+def fetch_weather(now):
+    """(response, from_cache)."""
     url = (
         "https://api.open-meteo.com/v1/forecast"
         f"?latitude={LAT}&longitude={LON}"
-        "&current=temperature_2m,apparent_temperature,weather_code"
-        "&hourly=temperature_2m,weather_code"
+        f"&current={','.join(CURRENT_FIELDS)}"
+        f"&hourly={','.join(CURRENT_FIELDS)}"
         "&daily=temperature_2m_max,temperature_2m_min,weather_code,"
         "precipitation_probability_max,precipitation_sum,sunrise,sunset"
-        "&forecast_days=2"
+        # 3 days, not 2, so a cache from last night still has today and tomorrow.
+        "&forecast_days=3"
         f"&timezone={TZ.key.replace('/', '%2F')}"
     )
-    d = fetch_json(url)
-    cur, daily, hourly = d["current"], d["daily"], d["hourly"]
+    try:
+        d = fetch_json(url)
+    except RETRYABLE_FETCH_ERRORS as e:
+        d = load_cached_weather(now)
+        if d is None:
+            raise
+        print(f"Open-Meteo unreachable ({e}); using cached weather from {d['fetched_at']}")
+        return d, True
+    d["fetched_at"] = now.isoformat()
+    WEATHER_CACHE.write_text(json.dumps(d))
+    return d, False
 
-    sunrise_dt = dt.datetime.fromisoformat(daily["sunrise"][0]).replace(tzinfo=TZ)
-    sunset_dt = dt.datetime.fromisoformat(daily["sunset"][0]).replace(tzinfo=TZ)
+
+def get_weather(now):
+    d, from_cache = fetch_weather(now)
+    daily, hourly = d["daily"], d["hourly"]
+    if from_cache:
+        # A cached "current" block is however old the cache is; this hour's
+        # forecast from the same response is the better estimate of now.
+        hi = hourly["time"].index(_hour_key(now))
+        cur = {k: hourly[k][hi] for k in CURRENT_FIELDS}
+    else:
+        cur = d["current"]
+    today = daily["time"].index(now.date().isoformat())
+    tmr = today + 1
+
+    sunrise_dt = dt.datetime.fromisoformat(daily["sunrise"][today]).replace(tzinfo=TZ)
+    sunset_dt = dt.datetime.fromisoformat(daily["sunset"][today]).replace(tzinfo=TZ)
 
     upcoming = []
     for t, temp, code in zip(hourly["time"], hourly["temperature_2m"], hourly["weather_code"]):
@@ -278,16 +338,16 @@ def get_weather(now):
         "code": cur["weather_code"],
         "is_night": is_night(now, sunrise_dt, sunset_dt),
         "label": WMO.get(cur["weather_code"], "—"),
-        "high": round(daily["temperature_2m_max"][0]),
-        "low": round(daily["temperature_2m_min"][0]),
-        "pop": daily["precipitation_probability_max"][0] or 0,
-        "precip_mm": daily["precipitation_sum"][0] or 0,
+        "high": round(daily["temperature_2m_max"][today]),
+        "low": round(daily["temperature_2m_min"][today]),
+        "pop": daily["precipitation_probability_max"][today] or 0,
+        "precip_mm": daily["precipitation_sum"][today] or 0,
         "sunrise": fmt_sun(sunrise_dt),
         "sunset": fmt_sun(sunset_dt),
-        "tmr_high": round(daily["temperature_2m_max"][1]),
-        "tmr_low": round(daily["temperature_2m_min"][1]),
-        "tmr_code": daily["weather_code"][1],
-        "tmr_label": WMO.get(daily["weather_code"][1], "—"),
+        "tmr_high": round(daily["temperature_2m_max"][tmr]),
+        "tmr_low": round(daily["temperature_2m_min"][tmr]),
+        "tmr_code": daily["weather_code"][tmr],
+        "tmr_label": WMO.get(daily["weather_code"][tmr], "—"),
         "hourly": upcoming,
     }
 

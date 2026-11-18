@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 venv/
 dash.png
+weather-cache.json
 _render.html
 kindle/config.sh
 pi/config.sh
